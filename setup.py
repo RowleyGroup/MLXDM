@@ -9,4 +9,4 @@ setup(name = 'torchanipbe0',
       version = '1.0.0',
       packages = find_packages(),
       include_package_data = True,
-      install_requires = ['torch', 'torchvision', 'requests','h5py', 'lark', 'ase'] )
+      install_requires = ['torch', 'requests','h5py', 'lark', 'ase'] )
