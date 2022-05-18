@@ -2,9 +2,9 @@
 
 ## Contents
 1. [Overview](#Overview)
-2. [Repo Contents](#Repo Contents)
-3. [System Requirements](#System Requirements)
-4. [Installation Guide](#Installation Guide)
+2. [Repo Contents](#Repo-Contents)
+3. [System Requirements](#System-Requirements)
+4. [Installation Guide](#Installation-Guide)
 5. [Demo](#Demo)
 6. [Results](#Results)
 7. [License](https://github.com/RowleyGroup/MLXDM/blob/main/LICENSE)
