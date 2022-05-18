@@ -1,5 +1,19 @@
-# MLXDM
-# TORCHANI PBE0 XDM DISPERSION
+# A Neural Network Potential with Rigorous Treatment of Long-Range Dispersion
+--# TORCHANI PBE0 XDM DISPERSION
+## Contents
+1. [Overview](#Overview)
+2. [Repo Contents](#Repo Contents)
+3. [System Requirements](#System Requirements)
+4. [Installation Guide](#Installation Guide)
+5. [Demo](#Demo)
+6. [Results](#Results)
+7. [Citation](#Citation)
+
+## Overview
+Neural Network Potentials (NNPs) like ANI are powerful tools to describe chemical systems with a high level of accuracy but with a lower computational cost. Because they use short-range cutoffs (e.g., 5 A), interactions outside this range, like London interactions, are not neglected. As a result, this limits the accuracy of these models for intermolecular interactions. In this project, we developed a new NNP to model the chemical systems considering the London dispersion interactions. The goal was achieved by calculating atomic dispersion coefficients with 6th, 8th, and 10th order terms (i.e., C6, C8, and C10) through a second NN, which is trained to reproduce the coefficients from the quantum-mechanically derived exchange-hole dipole moment (XDM) model.
+Additionally, we included a series of benchmark simulations to prove our work. Finally, we produce a comprehensive comparison across a range of benchmark simulations.
+
+
 
 Modified version of TorchANI github repository, which includes PBE0 functional trained version and dispersion correction
 
