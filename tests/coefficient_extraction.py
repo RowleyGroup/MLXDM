@@ -55,9 +55,9 @@ if __name__ == '__main__':
         postg_file = f'postg_output/s22_1_{r}-postg.out'
         atoms = io.read(xyz_file)
         coef_list = read_postg(postg_file)
-        print(f'******************System: {r}********************')
+        # print(f'******************System: {r}********************')
         for name, model, coef in zip(['C6','C8','C10'], model_list, coef_list):
-            print(f'  Coefficient: {name}')
+            # print(f'  Coefficient: {name}')
             outp = model.compute_from_ase(atoms)
             result[name] = result[name] + list(outp)
             ref[name] = ref[name] + coef
