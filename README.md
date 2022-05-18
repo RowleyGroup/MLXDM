@@ -1,5 +1,5 @@
 # A Neural Network Potential with Rigorous Treatment of Long-Range Dispersion
---# TORCHANI PBE0 XDM DISPERSION
+<># TORCHANI PBE0 XDM DISPERSION
 ## Contents
 1. [Overview](#Overview)
 2. [Repo Contents](#Repo Contents)
@@ -7,20 +7,46 @@
 4. [Installation Guide](#Installation Guide)
 5. [Demo](#Demo)
 6. [Results](#Results)
-7. [Citation](#Citation)
+7. [License](https://github.com/RowleyGroup/MLXDM/blob/main/LICENSE)
+8. [Citation](#Citation)
 
 ## Overview
 Neural Network Potentials (NNPs) like ANI are powerful tools to describe chemical systems with a high level of accuracy but with a lower computational cost. Because they use short-range cutoffs (e.g., 5 A), interactions outside this range, like London interactions, are not neglected. As a result, this limits the accuracy of these models for intermolecular interactions. In this project, we developed a new NNP to model the chemical systems considering the London dispersion interactions. The goal was achieved by calculating atomic dispersion coefficients with 6th, 8th, and 10th order terms (i.e., C6, C8, and C10) through a second NN, which is trained to reproduce the coefficients from the quantum-mechanically derived exchange-hole dipole moment (XDM) model.
 Additionally, we included a series of benchmark simulations to prove our work. Finally, we produce a comprehensive comparison across a range of benchmark simulations.
 
+## Repo Contents
 
+## System Requirements
+### Hardware Requirements
 
-Modified version of TorchANI github repository, which includes PBE0 functional trained version and dispersion correction
+### Software Requirements
 
-Feature includes in this modification:
+* Python 3 version > 3.8.1
+* PyTorch (torch) version > 1.10
+* Atomic Simulation Environment (ase) package version > 3.22
+* h5py package version > 3.6
+* requests package version > 2.26
+
+## Installation Guide
+
+## Demo
+
+## Results
+
+## Citation
+
+This code is a modified version of the [TorchANI](https://github.com/aiqm/torchani) by Gao et al. that introduces a new dispersion term (MLXDM). All work using this code should cite:
+
+TorchANI: A Free and Open Source PyTorch-Based Deep Learning Implementation of the ANI Neural Network Potentials
+Xiang Gao, Farhad Ramezanghorbani, Olexandr Isayev, Justin S. Smith, and Adrian E. Roitberg
+Journal of Chemical Information and Modeling 2020 60 (7), 3408-3415
+DOI: 10.1021/acs.jcim.0c00451
+<Modified version of TorchANI github repository, which includes PBE0 functional trained version and dispersion correction
+
+<Feature includes in this modification:
 1. Dispersion module: includes the network to map from AEV to coefficient 
 2. Interface with ase using existed torchani code to compute the energy and atomic forces
-3. Coefficients module: extract the information about components of dispersion energy
+3. Coefficients module: extract the information about components of dispersion energy>
 
 
 All of the models are includes in models.py unit, and can be called by
@@ -46,18 +72,9 @@ cd local-directory
 pip install -e .
 ```
 
-System requirement:
-* Python 3 version > 3.8.1
-* PyTorch (torch) version > 1.10
-* Atomic Simulation Environment (ase) package version > 3.22
-* h5py package version > 3.6
-* requests package version > 2.26
+
+
 
 All of the data is stored in resources/ folder, including the dispersion neural network in resources/dispersion folder.
 
-This code is a modified version of the [TorchANI](https://github.com/aiqm/torchani) by Gao et al. that introduces a new dispersion term (MLXDM). All work using this code should cite:
 
-TorchANI: A Free and Open Source PyTorch-Based Deep Learning Implementation of the ANI Neural Network Potentials
-Xiang Gao, Farhad Ramezanghorbani, Olexandr Isayev, Justin S. Smith, and Adrian E. Roitberg
-Journal of Chemical Information and Modeling 2020 60 (7), 3408-3415
-DOI: 10.1021/acs.jcim.0c00451
