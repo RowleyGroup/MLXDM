@@ -35,8 +35,8 @@ from ase.lattice.hexagonal import *
 from ase import units
 
 def print_result(result):
-    for r in result:
-        print(f'{r[0]} +/- {r[1]}')
+    for i, r in enumerate(result):
+        print(f'Model {i} :{r[0]} +/- {r[1]}')
 
 def f(atoms = None, model = None):
     atoms.set_calculator(model.ase())
@@ -69,16 +69,16 @@ if __name__ == '__main__':
     model_list = [model1, model2, model3, model4, model5, model6]
     result = []
     for model in model_list:
-        result.append(run_time(f, 100, 7, atoms = atoms, model = model))
+        result.append(run_time(f, 100, 5, atoms = atoms, model = model))
     print_result(result)
-    result = []
-    for model in model_list:
-        result.append(run_time(g, 100, 7, atoms = atoms, model = model))
-    print_result(result)
-    result = []
-    for model in model_list:
-        result.append(run_time(h, 1, 3, atoms = atoms, model = model))
-    print_result(result)
+    # result = []
+    # for model in model_list:
+    #     result.append(run_time(g, 100, 7, atoms = atoms, model = model))
+    # print_result(result)
+    # result = []
+    # for model in model_list:
+    #     result.append(run_time(h, 1, 3, atoms = atoms, model = model))
+    # print_result(result)
         
 
 

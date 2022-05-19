@@ -58,9 +58,39 @@ atoms.set_calculator(model.ase())
 model = ANIPBE0_MLXDM(dispersion_only = True)
 ```
 
-## Demo
+## Demos and Expected Results
+The program can be tested by running md.py file in tests folder:
+```bash
+python tests/md.py
+```
+The program should return the ase optimization convergence:
+```bash
+BFGS:  107 21:04:57    -4145.728931        0.4356
+BFGS:  108 21:04:57    -4145.640510        3.8882
+BFGS:  109 21:04:58    -4145.615297        4.5117
+BFGS:  110 21:04:58    -4145.752791        1.5679
+BFGS:  111 21:04:58    -4145.772124        0.4735
+BFGS:  112 21:04:59    -4145.778665        0.2748
+BFGS:  113 21:04:59    -4145.781417        0.3394
+BFGS:  114 21:04:59    -4145.784879        0.2482
+BFGS:  115 21:05:00    -4145.787949        0.1067
+BFGS:  116 21:05:00    -4145.788536        0.0914
+```
 
-## Results
+The package can use GPU acceleration with CUDA-support pytorch. runtime.py script can be used to test the implementation on your platform:
+```bash
+python tests/runtime.py
+```
+
+The output should return the time for each model in the platforms:
+```bash
+Model 0 :0.010524554252624514 +/- 0.0020818100745546514
+Model 1 :0.015416702747344972 +/- 0.0009169145365179207
+Model 2 :0.007183948040008545 +/- 0.0005930249659918058
+Model 3 :0.01378281879425049 +/- 0.0011457861853631064
+Model 4 :0.017068558216094973 +/- 0.00037427370213380894
+Model 5 :0.028385756015777586 +/- 0.0004956346444015525
+```
 
 ## Citation
 
