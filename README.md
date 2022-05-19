@@ -11,8 +11,8 @@
 8. [Citation](#Citation)
 
 ## Overview
-Neural Network Potentials (NNPs) like ANI are powerful tools to describe chemical systems with a high level of accuracy but with a lower computational cost. Because they use short-range cutoffs (e.g., 5 A), interactions outside this range, like London interactions, are not neglected. As a result, this limits the accuracy of these models for intermolecular interactions. In this project, we developed a new NNP to model the chemical systems considering the London dispersion interactions. The goal was achieved by calculating atomic dispersion coefficients with 6th, 8th, and 10th order terms (i.e., C6, C8, and C10) through a second NN, which is trained to reproduce the coefficients from the quantum-mechanically derived exchange-hole dipole moment (XDM) model.
-Additionally, we included a series of benchmark simulations to prove our work. Finally, we produce a comprehensive comparison across a range of benchmark simulations.
+Neural Network Potentials (NNPs) like ANI are powerful tools to describe chemical systems with a high level of accuracy that is comparable to DFT but with a much lower computational cost. Because they use short-range cutoffs (e.g., 5 A), interactions outside this range, like London interactions, are not neglected. As a result, this limits the accuracy of these models for intermolecular interactions. In this project, we developed a new NNP that explicitly models London dispersion interactions. The goal was achieved by calculating atomic dispersion coefficients with 6th, 8th, and 10th order terms (i.e., C6, C8, and C10) through a second NN, which is trained to reproduce the coefficients from the quantum-mechanically derived exchange-hole dipole moment (XDM) model.
+Aseries of benchmark simulations and examples are included.
 
 ## Repo Contents
 [tests](https://github.com/RowleyGroup/MLXDM/tree/main/tests):
@@ -25,8 +25,8 @@ Additionally, we included a series of benchmark simulations to prove our work. F
 
 ### Software Requirements
 #### OS Requirements
-This package is supported for macOS, Linux, and windows.
-The PBE0-MLXDM package is tested on Linux operating systems.
+This package requires a Python 3 environment and has been tested on  MacOS, Linux, and Windows distributions.
+The ANIPBE0-MLXDM package is tested on Linux operating systems.
 
 ### Python Dependencies
 * Python 3 version > 3.8.1
@@ -58,9 +58,9 @@ atoms.set_calculator(model.ase())
 model = ANIPBE0_MLXDM(dispersion_only = True)
 ```
 
-## Demo
+<! ## Demo>
 
-## Results
+<! ## Results >
 
 ## Citation
 
