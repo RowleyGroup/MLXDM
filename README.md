@@ -5,10 +5,9 @@
 2. [Repo Contents](#Repo-Contents)
 3. [System Requirements](#System-Requirements)
 4. [Installation Guide](#Installation-Guide)
-5. [Demo](#Demo)
-6. [Results](#Results)
-7. [License](https://github.com/RowleyGroup/MLXDM/blob/main/LICENSE)
-8. [Citation](#Citation)
+5. [Demos and Expected Results](#Demos-and-Expected-Results)
+6. [License](https://github.com/RowleyGroup/MLXDM/blob/main/LICENSE)
+7. [Citation](#Citation)
 
 ## Overview
 Neural Network Potentials (NNPs) like ANI are powerful tools to describe chemical systems with a high level of accuracy that is comparable to DFT but with a much lower computational cost. Because they use short-range cutoffs (e.g., 5 A), interactions outside this range, like London interactions, are not neglected. As a result, this limits the accuracy of these models for intermolecular interactions. In this project, we developed a new NNP that explicitly models London dispersion interactions. The goal was achieved by calculating atomic dispersion coefficients with 6th, 8th, and 10th order terms (i.e., C6, C8, and C10) through a second NN, which is trained to reproduce the coefficients from the quantum-mechanically derived exchange-hole dipole moment (XDM) model.
