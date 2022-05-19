@@ -58,9 +58,9 @@ atoms.set_calculator(model.ase())
 model = ANIPBE0_MLXDM(dispersion_only = True)
 ```
 
-<! ## Demo>
+## Demo
 
-<! ## Results >
+## Results
 
 ## Citation
 
