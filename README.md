@@ -39,7 +39,7 @@ The ANIPBE0-MLXDM package is tested on Linux operating systems.
 2. Installing the package locally
 ```bash
 cd local-directory
-pip install -e .
+pip install .
 ```
 3. All the models are included in models.py unit, and can be called by
 ```python
