@@ -530,23 +530,19 @@ def Dispersion_Constant_Coefficient(aev_computer, dtype = torch.float32, device 
     '''
     Return the dispersion model with constant dispersion coefficient for all elements
     '''
-    aev_dim = aev_computer.aev_length
     c6_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
                               [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
     c8_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
                               [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
     c10_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
                                [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-    c6_net._from_test([2.600449647885136, 23.061983280884782, 17.135130845295386,
-                         12.556216130003733, 0.0, 0.0, 0.0])
-    c8_net._from_test([60.833180003724095 , 874.3541364571732 , 501.1075149104262,
-                         292.68027102984985, 0.0, 0.0, 0.0])
-    c10_net._from_test([1989.5203220366673 , 35560.804188180955 , 15477.486179214131 ,
-                          7149.566647810778 , 0.0, 0.0, 0.0])
+    c6_net._from_test([2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233])
+    c8_net._from_test([60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626])
+    c10_net._from_test([2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642])
     return DispersionLayer(aev_computer, c6_net, c8_net, c10_net,
                            0.4186, 2.6791, 14.0, dtype, device)
 
-def ANI2xDispersion_Constant_Coef():
+def ANI2x_Dispersion_Constant_Coef():
     '''
     ANI2x model with constant coefficiet dispersion model
     '''
@@ -555,7 +551,7 @@ def ANI2xDispersion_Constant_Coef():
     disp_model = Dispersion_Constant_Coefficient(ani_model.aev_computer, dtype, None)
     return ANIDispersion(ani_model, disp_model)
 
-def ANIPBE0Dispersion_Constant_Coef():
+def ANIPBE0_Dispersion_Constant_Coef():
     '''
     ANIPBE0 model with constant coefficiet dispersion model
     '''

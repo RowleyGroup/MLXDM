@@ -315,7 +315,7 @@ class DispersionLayer(nn.Module):
         self.c6_layer = EnergyLayer(6, cutoff)
         self.c8_layer = EnergyLayer(8, cutoff)
         self.c10_layer = EnergyLayer(10, cutoff)
-        self.distance_layer_neightbor = DistanceNeighborList(cutoff)
+        self.distance_layer_neighbor = DistanceNeighborList(cutoff)
         self.species = species
 
     def forward(self, species_coordinates, cell = None, pbc = None):
@@ -332,7 +332,7 @@ class DispersionLayer(nn.Module):
         else:
             # Periodic system
             assert cell != None and pbc != None
-            distance, index = self.distance_layer_neightbor(species_coordinates[1], cell, pbc)
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
             c6_pair = self.coef_convert(c6, index)
             c8_pair = self.coef_convert(c8, index)
             c10_pair = self.coef_convert(c10, index)
@@ -348,6 +348,48 @@ class DispersionLayer(nn.Module):
             return TorchANICalculator(self.species, self, **kwargs)
         else:
             return TorchANICalculator(species, self, **kwargs)
+
+# class DispersionLayer2(nn.Module):
+#     '''
+#     The second generation Dispersion module
+#     Not using the combination rules, but original relation from eXchange-hole Dispersion Model
+#     Shape: [n_batch, n_atom]
+#     Output: [n_batch]
+#     '''
+#     def __init__(self, aev_computer, m1_net, m2_net, m3_net, v_net, a0_vdw, a1_vdw,
+#                  cutoff, dtype, device, species = None):
+#         super().__init__()
+#         self.cutoff = cutoff
+#         self.dtype = dtype
+#         self.device = device
+#         self.aev_computer = aev_computer
+#         self.m1_net = m1_net
+#         self.m2_net = m2_net
+#         self.m3_net = m3_net
+#         self.v_net = v_net
+#         # self.coef_convert = CoefficientConvert()
+#         self.distance_layer = DistanceLayer()
+#         self.vdw_layer = vanderWaalsLayer(a1_vdw, a0_vdw) # The order in the code is reversed
+#         self.c6_layer = EnergyLayer(6, cutoff)
+#         self.c8_layer = EnergyLayer(8, cutoff)
+#         self.c10_layer = EnergyLayer(10, cutoff)
+#         self.distance_layer_neighbor = DistanceNeighborList(cutoff)
+#         self.species = species
+
+#     def forward(self, species_coordinates, cell=None, pbc=None):
+#         species_aev = self.aev_computer(species_coordinates, cell, pbc)
+#         m1 = self.m1_net(species_aev)
+#         m2 = self.m2_net(species_aev)
+#         m3 = self.m3_net(species_aev)
+#         v = self.v_net(species_aev)
+# # *******************************************************************************************
+
+
+#     def ase(self, species=None, **kwargs):
+#         if species is None:
+#             return TorchANICalculator(self.species, self, **kwargs)
+#         else:
+#             return TorchANICalculator(species, self, **kwargs)
 
 # Get the energy for separate split
 class Dispersion_C6(DispersionLayer):
