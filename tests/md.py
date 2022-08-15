@@ -10,7 +10,7 @@ from ase.constraints import UnitCellFilter
 import torchanipbe0
 from torchanipbe0 import models
 
-model = models.ANIPBE0_MLXDM()
+model = models.ANIPBE0_MLXDM(exact_combination=True)
 graphite = Graphite(symbol = 'C',
                  latticeconstant={'a': 2.461,'c': 6.708},
                  pbc=True)

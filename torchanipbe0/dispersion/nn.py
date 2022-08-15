@@ -7,7 +7,6 @@ Last update: 2021-09-30
 import os
 import torch
 from torch import nn
-from torch.nn import functional as F
 from .utils import CAtomic, BOHR_TO_ANSTROM, cutoff_function, neighbor_list
 from ..ase import Calculator as TorchANICalculator
 from ..nn import SpeciesEnergies, ANIModel
@@ -121,6 +120,17 @@ class DispersionModel(ANIModel):
 
         atomic_energies = self._atomic_energies((species, aev))
         return CAtomic(species, atomic_energies)
+
+class ConstantLayer(nn.Module):
+    '''
+    Input: [n_batch, n_atom, aev_dim]
+    Output:[n_batch, n_atom]
+    '''
+    def __init__(self, param, dtype = None, device = None):
+        super().__init__()
+        self.param = torch.tensor(param, dtype = dtype, device = device)
+    def forward(self, x):
+        return self.param.repeat(x.size()[0], x.size()[1])
 
 class CoefficientLayer(nn.Module):
     class Shifter(nn.Module):
@@ -265,24 +275,13 @@ class CoefficientLayer(nn.Module):
         '''
         The model that return constant dispersion coefficients
         '''
-        class SampleLayer(nn.Module):
-            '''
-            Input: [n_batch, n_atom, aev_dim]
-            Output:[n_batch, n_atom]
-            '''
-            def __init__(self, param, dtype = None, device = None):
-                super().__init__()
-                self.param = torch.tensor(param, dtype = dtype, device = device)
-            def forward(self, x):
-                return self.param.repeat(x.size()[0], x.size()[1])
-
-        self.neural_networks = DispersionModel([SampleLayer(data[0], self.dtype, self.device),
-                                                SampleLayer(data[1], self.dtype, self.device),
-                                                SampleLayer(data[2], self.dtype, self.device),
-                                                SampleLayer(data[3], self.dtype, self.device),
-                                                SampleLayer(0.0, self.dtype, self.device),
-                                                SampleLayer(0.0, self.dtype, self.device),
-                                                SampleLayer(0.0, self.dtype, self.device)])
+        self.neural_networks = DispersionModel([ConstantLayer(data[0], self.dtype, self.device),
+                                                ConstantLayer(data[1], self.dtype, self.device),
+                                                ConstantLayer(data[2], self.dtype, self.device),
+                                                ConstantLayer(data[3], self.dtype, self.device),
+                                                ConstantLayer(0.0, self.dtype, self.device),
+                                                ConstantLayer(0.0, self.dtype, self.device),
+                                                ConstantLayer(0.0, self.dtype, self.device)])
 
     def forward(self, species_aev):
         x = self.neural_networks(species_aev)
@@ -349,47 +348,133 @@ class DispersionLayer(nn.Module):
         else:
             return TorchANICalculator(species, self, **kwargs)
 
-# class DispersionLayer2(nn.Module):
-#     '''
-#     The second generation Dispersion module
-#     Not using the combination rules, but original relation from eXchange-hole Dispersion Model
-#     Shape: [n_batch, n_atom]
-#     Output: [n_batch]
-#     '''
-#     def __init__(self, aev_computer, m1_net, m2_net, m3_net, v_net, a0_vdw, a1_vdw,
-#                  cutoff, dtype, device, species = None):
-#         super().__init__()
-#         self.cutoff = cutoff
-#         self.dtype = dtype
-#         self.device = device
-#         self.aev_computer = aev_computer
-#         self.m1_net = m1_net
-#         self.m2_net = m2_net
-#         self.m3_net = m3_net
-#         self.v_net = v_net
-#         # self.coef_convert = CoefficientConvert()
-#         self.distance_layer = DistanceLayer()
-#         self.vdw_layer = vanderWaalsLayer(a1_vdw, a0_vdw) # The order in the code is reversed
-#         self.c6_layer = EnergyLayer(6, cutoff)
-#         self.c8_layer = EnergyLayer(8, cutoff)
-#         self.c10_layer = EnergyLayer(10, cutoff)
-#         self.distance_layer_neighbor = DistanceNeighborList(cutoff)
-#         self.species = species
+# New update for correct combination rules
 
-#     def forward(self, species_coordinates, cell=None, pbc=None):
-#         species_aev = self.aev_computer(species_coordinates, cell, pbc)
-#         m1 = self.m1_net(species_aev)
-#         m2 = self.m2_net(species_aev)
-#         m3 = self.m3_net(species_aev)
-#         v = self.v_net(species_aev)
-# # *******************************************************************************************
+class PolarizabilityLayer(nn.Module):
+    def __init__(self, polar_free, volume_free):
+        super().__init__()
+        assert len(polar_free) == len(volume_free)
+        self.polar_free = polar_free
+        self.volume_free = volume_free
 
+    def forward(self, species_volume):
+        species = species_volume[0]
+        volume = species_volume[1]
+        result = torch.zeros_like(volume)
+        n = len(self.polar_free)
+        for i in range(n):
+            mask = (species==i)
+            result[mask] = volume[mask] * self.polar_free[i] / self.volume_free[i]
+        return result
 
-#     def ase(self, species=None, **kwargs):
-#         if species is None:
-#             return TorchANICalculator(self.species, self, **kwargs)
-#         else:
-#             return TorchANICalculator(species, self, **kwargs)
+class C6Layer(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, m, polar, indices):
+        # Change here
+        ind1 = indices[0,:]
+        ind2 = indices[1,:]
+        m1 = m[:,ind1]
+        m2 = m[:,ind2]
+        polar1 = polar[:,ind1]
+        polar2 = polar[:,ind2]
+        return m1 * m2 / (m1 / polar1 + m2 / polar2)
+
+class C8Layer(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, m1, m2, polar, indices):
+        ind1 = indices[0,:]
+        ind2 = indices[1,:]
+        m1_1 = m1[:,ind1]
+        m1_2 = m1[:,ind2]
+        m2_1 = m2[:,ind1]
+        m2_2 = m2[:,ind2]
+        polar1 = polar[:,ind1]
+        polar2 = polar[:,ind2]
+        return 1.5 * (m1_1*m2_2 + m1_2*m2_1) / (m1_1/polar1 + m1_2/polar2)
+
+class C10Layer(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, m1, m2, m3, polar, indices):
+        ind1 = indices[0,:]
+        ind2 = indices[1,:]
+        m1_1 = m1[:,ind1]
+        m1_2 = m1[:,ind2]
+        m2_1 = m2[:,ind1]
+        m2_2 = m2[:,ind2]
+        m3_1 = m3[:,ind1]
+        m3_2 = m3[:,ind2]
+        polar1 = polar[:,ind1]
+        polar2 = polar[:,ind2]
+        return 2*(m1_1*m3_2 + m3_1*m1_2 + 2.1*m2_1*m2_2)/(m1_1/polar1 + m1_2/polar2)
+
+# Use CoefficientLayer to cover the m1, m2, m3 and v net
+
+class DispersionLayer2(nn.Module):
+    '''
+    The second generation Dispersion module
+    Not using the combination rules, but original relation from eXchange-hole Dispersion Model
+    Shape: [n_batch, n_atom]
+    Output: [n_batch]
+    '''
+    def __init__(self, aev_computer, m1_net, m2_net, m3_net, v_net, a0_vdw, a1_vdw,
+                 polar_list, volume_list, cutoff, dtype, device, species = None):
+        # m1 net, m2 net, m3 net and v net should be used the CoefficientLayer to
+        # ensure the flow of the code
+        super().__init__()
+        self.cutoff = cutoff
+        self.dtype = dtype
+        self.device = device
+        self.aev_computer = aev_computer
+        self.m1_net = m1_net
+        self.m2_net = m2_net
+        self.m3_net = m3_net
+        self.v_net = v_net
+        # self.coef_convert = CoefficientConvert()
+        self.c6_layer = C6Layer()
+        self.c8_layer = C8Layer()
+        self.c10_layer = C10Layer()
+        self.distance_layer = DistanceLayer()
+        self.polar_layer = PolarizabilityLayer(polar_list, volume_list)
+        self.vdw_layer = vanderWaalsLayer(a1_vdw, a0_vdw) # The order in the code is reversed
+        self.c6_e_layer = EnergyLayer(6, cutoff)
+        self.c8_e_layer = EnergyLayer(8, cutoff)
+        self.c10_e_layer = EnergyLayer(10, cutoff)
+        self.distance_layer_neighbor = DistanceNeighborList(cutoff)
+        self.species = species
+
+    def forward(self, species_coordinates, cell=None, pbc=None):
+        species_aev = self.aev_computer(species_coordinates, cell, pbc)
+        m1 = self.m1_net(species_aev)
+        m2 = self.m2_net(species_aev)
+        m3 = self.m3_net(species_aev)
+        v = self.v_net(species_aev)
+        polar = self.polar_layer((species_aev[0], v))
+        if cell is None or pbc is None:
+            n_atom = m1.shape[1]
+            distance = self.distance_layer(species_coordinates[1])
+            index = torch.triu_indices(n_atom, n_atom, 1)
+        else:
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
+        c6_pair = self.c6_layer(m1, polar, index)
+        c8_pair = self.c8_layer(m1, m2, polar, index)
+        c10_pair = self.c10_layer(m1, m2, m3, polar, index)
+        rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
+        c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
+        c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
+        c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
+        return SpeciesEnergies(species_aev[0], c6_energy + c8_energy + c10_energy)
+
+    def ase(self, species=None, **kwargs):
+        if species is None:
+            return TorchANICalculator(self.species, self, **kwargs)
+        else:
+            return TorchANICalculator(species, self, **kwargs)
 
 # Get the energy for separate split
 class Dispersion_C6(DispersionLayer):
@@ -460,6 +545,76 @@ class Dispersion_C10(DispersionLayer):
         rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
         c10_energy = self.c10_layer(distance, c10_pair, rvdw)
         return SpeciesEnergies(species_aev[0], c10_energy)
+
+class Dispersion_C6_2(DispersionLayer2):
+    def forward(self, species_coordinates, cell = None, pbc = None):
+        species_aev = self.aev_computer(species_coordinates, cell, pbc)
+        m1 = self.m1_net(species_aev)
+        m2 = self.m2_net(species_aev)
+        m3 = self.m3_net(species_aev)
+        v = self.v_net(species_aev)
+        polar = self.polar_layer((species_aev[0], v))
+        if cell is None or pbc is None:
+            n_atom = m1.shape[1]
+            distance = self.distance_layer(species_coordinates[1])
+            index = torch.triu_indices(n_atom, n_atom, 1)
+        else:
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
+        c6_pair = self.c6_layer(m1, polar, index)
+        c8_pair = self.c8_layer(m1, m2, polar, index)
+        c10_pair = self.c10_layer(m1, m2, m3, polar, index)
+        rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
+        c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
+        c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
+        c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
+        return SpeciesEnergies(species_aev[0], c6_energy)
+
+class Dispersion_C8_2(DispersionLayer2):
+    def forward(self, species_coordinates, cell = None, pbc = None):
+        species_aev = self.aev_computer(species_coordinates, cell, pbc)
+        m1 = self.m1_net(species_aev)
+        m2 = self.m2_net(species_aev)
+        m3 = self.m3_net(species_aev)
+        v = self.v_net(species_aev)
+        polar = self.polar_layer((species_aev[0], v))
+        if cell is None or pbc is None:
+            n_atom = m1.shape[1]
+            distance = self.distance_layer(species_coordinates[1])
+            index = torch.triu_indices(n_atom, n_atom, 1)
+        else:
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
+        c6_pair = self.c6_layer(m1, polar, index)
+        c8_pair = self.c8_layer(m1, m2, polar, index)
+        c10_pair = self.c10_layer(m1, m2, m3, polar, index)
+        rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
+        c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
+        c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
+        c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
+        return SpeciesEnergies(species_aev[0], c8_energy)
+
+class Dispersion_C10_2(DispersionLayer2):
+    def forward(self, species_coordinates, cell = None, pbc = None):
+        species_aev = self.aev_computer(species_coordinates, cell, pbc)
+        m1 = self.m1_net(species_aev)
+        m2 = self.m2_net(species_aev)
+        m3 = self.m3_net(species_aev)
+        v = self.v_net(species_aev)
+        polar = self.polar_layer((species_aev[0], v))
+        if cell is None or pbc is None:
+            n_atom = m1.shape[1]
+            distance = self.distance_layer(species_coordinates[1])
+            index = torch.triu_indices(n_atom, n_atom, 1)
+        else:
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
+        c6_pair = self.c6_layer(m1, polar, index)
+        c8_pair = self.c8_layer(m1, m2, polar, index)
+        c10_pair = self.c10_layer(m1, m2, m3, polar, index)
+        rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
+        c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
+        c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
+        c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
+        return SpeciesEnergies(species_aev[0], c10_energy)
+
 
 class ANIDispersion(nn.Module):
     '''

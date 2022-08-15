@@ -34,8 +34,9 @@ from torch import Tensor
 from typing import Tuple, Optional, NamedTuple
 from .nn import SpeciesConverter, SpeciesEnergies
 from .aev import AEVComputer
-from .dispersion import CoefficientLayer, DispersionLayer, ANIDispersion
+from .dispersion import CoefficientLayer, DispersionLayer, DispersionLayer2, ANIDispersion
 from .dispersion import Dispersion_C6, Dispersion_C8, Dispersion_C10
+from .dispersion import Dispersion_C6_2, Dispersion_C8_2, Dispersion_C10_2
 from pathlib import Path
 
 class SpeciesEnergiesQBC(NamedTuple):
@@ -551,15 +552,6 @@ def ANI2x_Dispersion_Constant_Coef():
     disp_model = Dispersion_Constant_Coefficient(ani_model.aev_computer, dtype, None)
     return ANIDispersion(ani_model, disp_model)
 
-def ANIPBE0_Dispersion_Constant_Coef():
-    '''
-    ANIPBE0 model with constant coefficiet dispersion model
-    '''
-    ani_model = ANIPBE0()
-    dtype = ani_model.neural_networks[0]['0'][0].weight.dtype # Get the dtype of neural network
-    disp_model = Dispersion_Constant_Coefficient(ani_model.aev_computer, dtype, None)
-    return ANIDispersion(ani_model, disp_model)
-
 def Dispersion(aev_computer, path, dtype = torch.float32, device = None, species = None):
     '''
     Dispersion model
@@ -611,7 +603,8 @@ def DispersionLayer_C6(aev_computer, path, dtype = torch.float32, device = None,
                                          [384, 128, 112, 96]])
     return Dispersion_C6(aev_computer, c6_net, c8_net, c10_net,
                            0.4186, 2.6791, 14.0, dtype, device, species)
-                           
+
+
 def DispersionLayer_C8(aev_computer, path, dtype = torch.float32, device = None, species = None):
     '''
     Dispersion model
@@ -664,31 +657,191 @@ def DispersionLayer_C10(aev_computer, path, dtype = torch.float32, device = None
     return Dispersion_C10(aev_computer, c6_net, c8_net, c10_net,
                            0.4186, 2.6791, 14.0, dtype, device, species)
 
-def ANIPBE0_C6():
+def Dispersion_2(aev_computer, path, dtype = torch.float32, device = None, species = None):
+    # Use CoefficientLayer for similar behavior of normal coefficients
+    m1_net = CoefficientLayer([1.5487023355096374, 4.33832763491479, 4.689239793170584, 4.835634998519475],
+                              [0.12092114874978759, 0.4171882700357045, 0.5586210781338053, 0.4070627085041909])
+    m2_net = CoefficientLayer([12.5683581996112, 55.10387928710763, 45.607226558095036, 37.35790106431391],
+                              [1.1739220921349471, 5.030540928979481, 5.739017414160557, 3.827982573531133])
+    m3_net = CoefficientLayer([204.21782032761914, 971.7168397173592, 592.7362211972969, 372.60697888431537],
+                              [17.42101897973452, 75.12440414708934, 58.82559008729809, 34.5463306934543])
+    v_net = CoefficientLayer([6.027731295335626, 31.54828240955614, 26.242213297618285, 21.793723234843963],
+                              [0.38563987151949186, 1.0527722226285448, 1.0606388518419783, 0.8187177116508805])
+    m1_net._from_file_2(f'{path}m1/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m2_net._from_file_2(f'{path}m2/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m3_net._from_file_2(f'{path}m3/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    v_net._from_file_2(f'{path}v/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    return DispersionLayer2(aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
+                            14.0, dtype, device, species)
+
+def DispersionLayer_C6_2(aev_computer, path, dtype = torch.float32, device = None, species = None):
+    m1_net = CoefficientLayer([1.5487023355096374, 4.33832763491479, 4.689239793170584, 4.835634998519475],
+                              [0.12092114874978759, 0.4171882700357045, 0.5586210781338053, 0.4070627085041909])
+    m2_net = CoefficientLayer([12.5683581996112, 55.10387928710763, 45.607226558095036, 37.35790106431391],
+                              [1.1739220921349471, 5.030540928979481, 5.739017414160557, 3.827982573531133])
+    m3_net = CoefficientLayer([204.21782032761914, 971.7168397173592, 592.7362211972969, 372.60697888431537],
+                              [17.42101897973452, 75.12440414708934, 58.82559008729809, 34.5463306934543])
+    v_net = CoefficientLayer([6.027731295335626, 31.54828240955614, 26.242213297618285, 21.793723234843963],
+                              [0.38563987151949186, 1.0527722226285448, 1.0606388518419783, 0.8187177116508805])
+    m1_net._from_file_2(f'{path}m1/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m2_net._from_file_2(f'{path}m2/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m3_net._from_file_2(f'{path}m3/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    v_net._from_file_2(f'{path}v/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    return Dispersion_C6_2(aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
+                            14.0, dtype, device, species)
+
+def DispersionLayer_C8_2(aev_computer, path, dtype = torch.float32, device = None, species = None):
+    m1_net = CoefficientLayer([1.5487023355096374, 4.33832763491479, 4.689239793170584, 4.835634998519475],
+                              [0.12092114874978759, 0.4171882700357045, 0.5586210781338053, 0.4070627085041909])
+    m2_net = CoefficientLayer([12.5683581996112, 55.10387928710763, 45.607226558095036, 37.35790106431391],
+                              [1.1739220921349471, 5.030540928979481, 5.739017414160557, 3.827982573531133])
+    m3_net = CoefficientLayer([204.21782032761914, 971.7168397173592, 592.7362211972969, 372.60697888431537],
+                              [17.42101897973452, 75.12440414708934, 58.82559008729809, 34.5463306934543])
+    v_net = CoefficientLayer([6.027731295335626, 31.54828240955614, 26.242213297618285, 21.793723234843963],
+                              [0.38563987151949186, 1.0527722226285448, 1.0606388518419783, 0.8187177116508805])
+    m1_net._from_file_2(f'{path}m1/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m2_net._from_file_2(f'{path}m2/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m3_net._from_file_2(f'{path}m3/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    v_net._from_file_2(f'{path}v/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    return Dispersion_C8_2(aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
+                            14.0, dtype, device, species)
+
+def DispersionLayer_C10_2(aev_computer, path, dtype = torch.float32, device = None, species = None):
+    m1_net = CoefficientLayer([1.5487023355096374, 4.33832763491479, 4.689239793170584, 4.835634998519475],
+                              [0.12092114874978759, 0.4171882700357045, 0.5586210781338053, 0.4070627085041909])
+    m2_net = CoefficientLayer([12.5683581996112, 55.10387928710763, 45.607226558095036, 37.35790106431391],
+                              [1.1739220921349471, 5.030540928979481, 5.739017414160557, 3.827982573531133])
+    m3_net = CoefficientLayer([204.21782032761914, 971.7168397173592, 592.7362211972969, 372.60697888431537],
+                              [17.42101897973452, 75.12440414708934, 58.82559008729809, 34.5463306934543])
+    v_net = CoefficientLayer([6.027731295335626, 31.54828240955614, 26.242213297618285, 21.793723234843963],
+                              [0.38563987151949186, 1.0527722226285448, 1.0606388518419783, 0.8187177116508805])
+    m1_net._from_file_2(f'{path}m1/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m2_net._from_file_2(f'{path}m2/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    m3_net._from_file_2(f'{path}m3/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    v_net._from_file_2(f'{path}v/', [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]])
+    return Dispersion_C10_2(aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
+                            14.0, dtype, device, species)
+
+def Dispersion_Constant_Coef_2(aev_computer, dtype = torch.float32, device = None, species = None):
+    m1_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+                              [1.0, 1.0, 1.0, 1.0])
+    m2_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+                              [1.0, 1.0, 1.0, 1.0])
+    m3_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+                              [1.0, 1.0, 1.0, 1.0])
+    v_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+                              [1.0, 1.0, 1.0, 1.0])
+    m1_net._from_test([1.5487023355096374, 4.33832763491479, 4.689239793170584, 4.835634998519475])
+    m2_net._from_test([12.5683581996112, 55.10387928710763, 45.607226558095036, 37.35790106431391])
+    m3_net._from_test([204.21782032761914, 971.7168397173592, 592.7362211972969, 372.60697888431537])
+    v_net._from_test([6.027731295335626, 31.54828240955614, 26.242213297618285, 21.793723234843963])
+    return DispersionLayer2(aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
+                            14.0, dtype, device, species)
+
+def ANIPBE0_C6(exact_combination=False):
     ani_model = ANIPBE0()
     dtype = ani_model.neural_networks[0]['0'][0].weight.dtype
     torchani_dir = Path(__file__).resolve().parent.as_posix()
     path = os.path.join(torchani_dir, 'resources/dispersion/')
-    disp_model = DispersionLayer_C6(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    if exact_combination:
+        disp_model = DispersionLayer_C6_2(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    else:
+        disp_model = DispersionLayer_C6(ani_model.aev_computer, path, dtype, None, ani_model.species)
     return disp_model
     
-def ANIPBE0_C8():
+def ANIPBE0_C8(exact_combination=False):
     ani_model = ANIPBE0()
     dtype = ani_model.neural_networks[0]['0'][0].weight.dtype
     torchani_dir = Path(__file__).resolve().parent.as_posix()
     path = os.path.join(torchani_dir, 'resources/dispersion/')
-    disp_model = DispersionLayer_C8(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    if exact_combination:
+        disp_model = DispersionLayer_C8_2(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    else:
+        disp_model = DispersionLayer_C8(ani_model.aev_computer, path, dtype, None, ani_model.species)
     return disp_model
     
-def ANIPBE0_C10():
+def ANIPBE0_C10(exact_combination=False):
     ani_model = ANIPBE0()
     dtype = ani_model.neural_networks[0]['0'][0].weight.dtype
     torchani_dir = Path(__file__).resolve().parent.as_posix()
     path = os.path.join(torchani_dir, 'resources/dispersion/')
-    disp_model = DispersionLayer_C10(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    if exact_combination:
+        disp_model = DispersionLayer_C10_2(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    else:
+        disp_model = DispersionLayer_C10(ani_model.aev_computer, path, dtype, None, ani_model.species)
     return disp_model
 
-def ANIPBE0_MLXDM(dispersion_only = False, model_index = None):
+def ANIPBE0_Dispersion_Constant_Coef(exact_combination=False):
+    '''
+    ANIPBE0 model with constant coefficiet dispersion model
+    '''
+    ani_model = ANIPBE0()
+    dtype = ani_model.neural_networks[0]['0'][0].weight.dtype # Get the dtype of neural network
+    if exact_combination:
+        disp_model = Dispersion_Constant_Coef_2(ani_model.aev_computer, dtype, None)
+    else:
+        disp_model = Dispersion_Constant_Coefficient(ani_model.aev_computer, dtype, None)
+    return ANIDispersion(ani_model, disp_model)
+
+def ANIPBE0_MLXDM(dispersion_only = False, model_index = None, exact_combination=False):
     '''
     ANIPBE0 with Machine Learning XDM
     dispersion_only = True: return the dispersion part only
@@ -700,7 +853,10 @@ def ANIPBE0_MLXDM(dispersion_only = False, model_index = None):
         dtype = ani_model.neural_networks['0'][0].weight.dtype
     torchani_dir = Path(__file__).resolve().parent.as_posix()
     path = os.path.join(torchani_dir, 'resources/dispersion/')
-    disp_model = Dispersion(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    if exact_combination:
+        disp_model = Dispersion_2(ani_model.aev_computer, path, dtype, None, ani_model.species)
+    else:
+        disp_model = Dispersion(ani_model.aev_computer, path, dtype, None, ani_model.species)
     if dispersion_only:
         return disp_model
     else:

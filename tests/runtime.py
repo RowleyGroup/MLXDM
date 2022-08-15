@@ -53,19 +53,19 @@ def h(atoms = None, model = None):
 
 if __name__ == '__main__':
     # atoms = io.read('xyz/S22by7_1_0.7_dimer.xyz')
-    # atoms = io.read('xyz/S22by7_6_1.2_dimer.xyz')
-    atoms = Graphite(symbol = 'C',
-                     latticeconstant={'a': 2.461,'c': 6.708},
-                     # size = (3,3,2),
-                     pbc=True)
+    atoms = io.read('xyz/S22by7_6_1.2_dimer.xyz')
+    # atoms = Graphite(symbol = 'C',
+    #                  latticeconstant={'a': 2.461,'c': 6.708},
+    #                  # size = (3,3,2),
+    #                  pbc=True)
     device = torch.device('cuda')
 
     model1 = models.ANI2x()
     model2 = models.ANI2x().to(device)
     model3 = models.ANIPBE0()
     model4 = models.ANIPBE0().to(device)
-    model5 = models.ANIPBE0_MLXDM()
-    model6 = models.ANIPBE0_MLXDM().to(device)
+    model5 = models.ANIPBE0_MLXDM(exact_combination=True)
+    model6 = models.ANIPBE0_MLXDM(exact_combination=True).to(device)
     model_list = [model1, model2, model3, model4, model5, model6]
     result = []
     for model in model_list:
