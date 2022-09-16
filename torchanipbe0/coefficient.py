@@ -25,7 +25,7 @@ class CoefficientExtractor(nn.Module):
         self.device = device
         self.species_to_tensor = species_to_tensor
     
-    def forward(self, species_coordinates, cell = None, pbc = None):
+    def forward(self, species_coordinates, cell=None, pbc=None):
         species_aev = self.aev_computer(species_coordinates, cell, pbc)
         return self.model(species_aev)
         
@@ -45,7 +45,7 @@ class CoefficientExtractor(nn.Module):
         output = self(species_coordinates, cell, pbc)
         return output.squeeze().detach().cpu().numpy()
         
-def c6_coefficient_model(device = None):
+def c6_coefficient_model(device=None):
     torchani_dir = Path(__file__).resolve().parent.as_posix()
     ani_model = models.ANIPBE0()
     path = os.path.join(torchani_dir, 'resources/dispersion/c6/')
@@ -57,7 +57,7 @@ def c6_coefficient_model(device = None):
                                 [0.20894301395856424, 1.4590016624541282, 1.8738488642622464, 1.224105161636984],
                                 ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
                                 
-def c8_coefficient_model(device = None):
+def c8_coefficient_model(device=None):
     torchani_dir = Path(__file__).resolve().parent.as_posix()
     ani_model = models.ANIPBE0()
     path = os.path.join(torchani_dir, 'resources/dispersion/c8/')
@@ -69,7 +69,7 @@ def c8_coefficient_model(device = None):
                                 [6.0737109984570985, 62.200168506367056, 60.73042587155412, 33.13683091496654],
                                 ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
                                 
-def c10_coefficient_model(device = None):
+def c10_coefficient_model(device=None):
     torchani_dir = Path(__file__).resolve().parent.as_posix()
     ani_model = models.ANIPBE0()
     path = os.path.join(torchani_dir, 'resources/dispersion/c10/')
@@ -81,3 +81,50 @@ def c10_coefficient_model(device = None):
                                 [257.49041066441407, 3266.5763911897166, 2009.8906257122967, 863.8261589061798],
                                 ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
     
+def m1_model(device=None):
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = models.ANIPBE0()
+    path = os.path.join(torchani_dir, 'resources/dispersion/m1/')
+    return CoefficientExtractor(path, [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]], 
+                                [1.5487023355096374, 4.33832763491479, 4.689239793170584, 4.835634998519475],
+                                [0.12092114874978759, 0.4171882700357045, 0.5586210781338053, 0.4070627085041909],
+                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
+def m2_model(device=None):
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = models.ANIPBE0()
+    path = os.path.join(torchani_dir, 'resources/dispersion/m2/')
+    return CoefficientExtractor(path, [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]], 
+                                [12.5683581996112, 55.10387928710763, 45.607226558095036, 37.35790106431391],
+                                [1.1739220921349471, 5.030540928979481, 5.739017414160557, 3.827982573531133],
+                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
+def m3_model(device=None):
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = models.ANIPBE0()
+    path = os.path.join(torchani_dir, 'resources/dispersion/m3/')
+    return CoefficientExtractor(path, [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]], 
+                                [204.21782032761914, 971.7168397173592, 592.7362211972969, 372.60697888431537],
+                                [17.42101897973452, 75.12440414708934, 58.82559008729809, 34.5463306934543],
+                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
+def v_model(device=None):
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = models.ANIPBE0()
+    path = os.path.join(torchani_dir, 'resources/dispersion/v/')
+    return CoefficientExtractor(path, [[384, 160, 128, 96],
+                                       [384, 144, 112, 96],
+                                       [384, 128, 112, 96],
+                                       [384, 128, 112, 96]], 
+                                [6.027731295335626, 31.54828240955614, 26.242213297618285, 21.793723234843963],
+                                [0.38563987151949186, 1.0527722226285448, 1.0606388518419783, 0.8187177116508805],
+                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
