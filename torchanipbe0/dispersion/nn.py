@@ -565,8 +565,8 @@ class Dispersion_C6_2(DispersionLayer2):
         c10_pair = self.c10_layer(m1, m2, m3, polar, index)
         rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
         c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
-        c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
-        c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
+        # c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
+        # c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
         return SpeciesEnergies(species_aev[0], c6_energy)
 
 class Dispersion_C8_2(DispersionLayer2):
@@ -587,9 +587,9 @@ class Dispersion_C8_2(DispersionLayer2):
         c8_pair = self.c8_layer(m1, m2, polar, index)
         c10_pair = self.c10_layer(m1, m2, m3, polar, index)
         rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
-        c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
+        # c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
         c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
-        c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
+        # c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
         return SpeciesEnergies(species_aev[0], c8_energy)
 
 class Dispersion_C10_2(DispersionLayer2):
@@ -610,8 +610,8 @@ class Dispersion_C10_2(DispersionLayer2):
         c8_pair = self.c8_layer(m1, m2, polar, index)
         c10_pair = self.c10_layer(m1, m2, m3, polar, index)
         rvdw = self.vdw_layer(c6_pair,c8_pair,c10_pair)
-        c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
-        c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
+        # c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
+        # c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
         c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
         return SpeciesEnergies(species_aev[0], c10_energy)
 
