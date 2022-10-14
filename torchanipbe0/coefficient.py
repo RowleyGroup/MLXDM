@@ -2,6 +2,7 @@
 # Author: Tu Nguyen Thien Phuc
 # Date: 2022-05-04
 
+import numpy as np
 import torch
 import os
 from torch import nn
@@ -33,7 +34,7 @@ class CoefficientExtractor(nn.Module):
     def compute_from_ase(self, atoms):
         species = self.species_to_tensor(atoms.get_chemical_symbols()).to(self.device)
         species = species.unsqueeze(0)
-        cell = torch.tensor(atoms.get_cell(complete = True),
+        cell = torch.tensor(np.array(atoms.get_cell(complete = True)),
                             dtype = self.dtype, device = self.device)
         pbc = torch.tensor(atoms.get_pbc(), dtype = torch.bool,
                            device = self.device)

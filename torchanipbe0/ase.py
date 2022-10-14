@@ -6,6 +6,7 @@
 """
 
 import torch
+import numpy as np
 from . import utils
 import ase.calculators.calculator
 import ase.units
@@ -50,7 +51,7 @@ class Calculator(ase.calculators.calculator.Calculator):
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=ase.calculators.calculator.all_changes):
         super().calculate(atoms, properties, system_changes)
-        cell = torch.tensor(self.atoms.get_cell(complete=True),
+        cell = torch.tensor(np.array(self.atoms.get_cell(complete=True)),
                             dtype=self.dtype, device=self.device)
         pbc = torch.tensor(self.atoms.get_pbc(), dtype=torch.bool,
                            device=self.device)
