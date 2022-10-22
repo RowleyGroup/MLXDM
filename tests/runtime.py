@@ -5,24 +5,6 @@
 import numpy as np
 import time
 
-def run_time(func, loop = 1, repeat = 5, **kwargs):
-    lst = []
-    s = 0.0
-    for i in range(repeat):
-        start_time = time.time()
-        for j in range(loop):
-            func(**kwargs)
-        end_time = time.time()
-        t = (end_time - start_time) / loop
-        s += t
-        lst.append(t)
-    s /= repeat
-    var = 0.0
-    for i in range(repeat):
-        var += (lst[i] - s)**2
-    var /= repeat
-    var = var ** 0.5
-    return s, var
     
 import torchanipbe0
 from torchanipbe0 import models
@@ -33,6 +15,10 @@ from ase import io
 from ase.md.verlet import VelocityVerlet
 from ase.lattice.hexagonal import *
 from ase import units
+
+# Declare the system
+
+
 
 def print_result(result):
     for i, r in enumerate(result):

@@ -58,8 +58,6 @@ class ANIModel(torch.nn.ModuleDict):
         assert species.shape == aev.shape[:-1]
 
         atomic_energies = self._atomic_energies((species, aev))
-        # print(atomic_energies)
-        # shape of atomic energies is (C, A)
         return SpeciesEnergies(species, torch.sum(atomic_energies, dim=1))
 
     @torch.jit.export
