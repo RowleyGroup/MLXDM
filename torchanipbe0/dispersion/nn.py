@@ -623,7 +623,7 @@ class C8DispersionSimpleLayer(DispersionSimpleLayer):
         else:
             # Periodic system
             assert cell != None and pbc != None
-            distance, index = self.distance_layer_neightbor(species_coordinates[1], cell, pbc)
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
             c6_pair = self.coef_convert(c6, index)
             c8_pair = self.coef_convert(c8, index)
             c10_pair = self.coef_convert(c10, index)
@@ -646,7 +646,7 @@ class C10DispersionSimpleLayer(DispersionSimpleLayer):
         else:
             # Periodic system
             assert cell != None and pbc != None
-            distance, index = self.distance_layer_neightbor(species_coordinates[1], cell, pbc)
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
             c6_pair = self.coef_convert(c6, index)
             c8_pair = self.coef_convert(c8, index)
             c10_pair = self.coef_convert(c10, index)
