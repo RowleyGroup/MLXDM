@@ -581,20 +581,26 @@ def XDM_CC(device = None):
     '''
     Return XDM model with constants parameters for M1, M2, M3 and V
     '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    path = os.path.join(torchani_dir, 'resources/dispersion/')
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    m1_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    m2_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    m3_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    v_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    m1_net._from_constants([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436])
-    m2_net._from_constants([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353])
-    m3_net._from_constants([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ])
-    v_net._from_constants([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934])
+    # m1_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # m2_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # m3_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # v_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # m1_net._from_constants([1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297])
+    # m2_net._from_constants([12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518])
+    # m3_net._from_constants([204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719])
+    # v_net._from_constants([5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762])
+    m1_net = CoefficientLayer._from_constants_2(f'{path}m1/', dtype=torch.float32, device=device)
+    m2_net = CoefficientLayer._from_constants_2(f'{path}m2/', dtype=torch.float32, device=device)
+    m3_net = CoefficientLayer._from_constants_2(f'{path}m3/', dtype=torch.float32, device=device)
+    v_net = CoefficientLayer._from_constants_2(f'{path}v/', dtype=torch.float32, device=device)
     return DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
                             0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
@@ -608,30 +614,34 @@ def MLXDM(device=None):
     path = os.path.join(torchani_dir, 'resources/dispersion/')
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    m1_net = CoefficientLayer([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436],
-                              [0.13029707571933283,  0.41856823837780816, 0.5586210781338053, 0.41042248639907647], device=device)
-    m2_net = CoefficientLayer([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353],
-                              [ 1.255806866193107, 5.049545544384645, 5.760223014440548, 3.8609340187976002], device=device)
-    m3_net = CoefficientLayer([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ],
-                              [29.214223064239675, 105.02775007458423, 75.45394645670979,  44.646118060351654], device=device)
-    v_net = CoefficientLayer([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934],
-                              [0.399302284970174, 1.048545480933507, 1.0702473171989684, 0.8387921252405294], device=device)
-    m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
+    # m1_net = CoefficientLayer([1.5387991478142131, 4.289561550921485, 4.645156171420979, 4.850207548654743],
+    #                           [0.10073026158595627,  0.32026614161920397, 0.5197365184169386, 0.40630394084862], device=device)
+    # m2_net = CoefficientLayer([12.437804540901457, 54.48363569998036, 45.149395951173936, 37.34104702706176],
+    #                           [0.9786777544264903, 4.053295667477704, 5.425694542787608, 3.7954076020675926], device=device)
+    # m3_net = CoefficientLayer([206.17852168828168, 979.4199976430037, 595.099518902867, 380.64708697875005],
+    #                           [23.256566840066665, 96.9223517722414, 72.28240733089076,  41.99341881961095], device=device)
+    # v_net = CoefficientLayer([5.989351101511198, 31.50798288294097, 26.223484145547264, 21.803871346320026],
+    #                           [0.3248316703038574, 0.9794955232854025, 1.0381122406556889, 0.7870355961386578], device=device)
+    # m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
     return DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
                             0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
@@ -757,30 +767,34 @@ def c6_energy(device = None):
     path = os.path.join(torchani_dir, 'resources/dispersion/')
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    m1_net = CoefficientLayer([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436],
-                              [0.13029707571933283,  0.41856823837780816, 0.5586210781338053, 0.41042248639907647], device=device)
-    m2_net = CoefficientLayer([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353],
-                              [ 1.255806866193107, 5.049545544384645, 5.760223014440548, 3.8609340187976002], device=device)
-    m3_net = CoefficientLayer([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ],
-                              [29.214223064239675, 105.02775007458423, 75.45394645670979,  44.646118060351654], device=device)
-    v_net = CoefficientLayer([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934],
-                              [0.399302284970174, 1.048545480933507, 1.0702473171989684, 0.8387921252405294], device=device)
-    m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
+    # m1_net = CoefficientLayer([1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297],
+    #                           [0.09083497075483686,  0.29233367103037566, 0.4101351666476082, 0.3656859134027069], device=device)
+    # m2_net = CoefficientLayer([12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518],
+    #                           [0.8943669296845979, 3.6988180667458797, 4.581255912025152, 3.489828958880325], device=device)
+    # m3_net = CoefficientLayer([204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719],
+    #                           [21.02327059669788, 81.32863683647228, 66.80020511370267,  38.107797462487774], device=device)
+    # v_net = CoefficientLayer([5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762],
+    #                           [0.28705711113029336, 0.8573275930561899, 0.8568476107305737, 0.6390083426260285], device=device)
+    # m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
     return C6DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
                             0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
@@ -794,30 +808,34 @@ def c8_energy(device = None):
     path = os.path.join(torchani_dir, 'resources/dispersion/')
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    m1_net = CoefficientLayer([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436],
-                              [0.13029707571933283,  0.41856823837780816, 0.5586210781338053, 0.41042248639907647], device=device)
-    m2_net = CoefficientLayer([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353],
-                              [ 1.255806866193107, 5.049545544384645, 5.760223014440548, 3.8609340187976002], device=device)
-    m3_net = CoefficientLayer([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ],
-                              [29.214223064239675, 105.02775007458423, 75.45394645670979,  44.646118060351654], device=device)
-    v_net = CoefficientLayer([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934],
-                              [0.399302284970174, 1.048545480933507, 1.0702473171989684, 0.8387921252405294], device=device)
-    m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
+    # m1_net = CoefficientLayer([1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297],
+    #                           [0.09083497075483686,  0.29233367103037566, 0.4101351666476082, 0.3656859134027069], device=device)
+    # m2_net = CoefficientLayer([12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518],
+    #                           [0.8943669296845979, 3.6988180667458797, 4.581255912025152, 3.489828958880325], device=device)
+    # m3_net = CoefficientLayer([204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719],
+    #                           [21.02327059669788, 81.32863683647228, 66.80020511370267,  38.107797462487774], device=device)
+    # v_net = CoefficientLayer([5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762],
+    #                           [0.28705711113029336, 0.8573275930561899, 0.8568476107305737, 0.6390083426260285], device=device)
+    # m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
     return C8DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
                             0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
@@ -831,30 +849,34 @@ def c10_energy(device = None):
     path = os.path.join(torchani_dir, 'resources/dispersion/')
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    m1_net = CoefficientLayer([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436],
-                              [0.13029707571933283,  0.41856823837780816, 0.5586210781338053, 0.41042248639907647], device=device)
-    m2_net = CoefficientLayer([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353],
-                              [ 1.255806866193107, 5.049545544384645, 5.760223014440548, 3.8609340187976002], device=device)
-    m3_net = CoefficientLayer([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ],
-                              [29.214223064239675, 105.02775007458423, 75.45394645670979,  44.646118060351654], device=device)
-    v_net = CoefficientLayer([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934],
-                              [0.399302284970174, 1.048545480933507, 1.0702473171989684, 0.8387921252405294], device=device)
-    m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
+    # m1_net = CoefficientLayer([1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297],
+    #                           [0.09083497075483686,  0.29233367103037566, 0.4101351666476082, 0.3656859134027069], device=device)
+    # m2_net = CoefficientLayer([12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518],
+    #                           [0.8943669296845979, 3.6988180667458797, 4.581255912025152, 3.489828958880325], device=device)
+    # m3_net = CoefficientLayer([204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719],
+    #                           [21.02327059669788, 81.32863683647228, 66.80020511370267,  38.107797462487774], device=device)
+    # v_net = CoefficientLayer([5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762],
+    #                           [0.28705711113029336, 0.8573275930561899, 0.8568476107305737, 0.6390083426260285], device=device)
+    # m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
     return C10DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
                             0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
@@ -1040,13 +1062,14 @@ def m1_coefficients(device=None):
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion/m1/')
-    return CoefficientExtractor(path, [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]], 
-                                [1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436],
-                                [0.13029707571933283,  0.41856823837780816, 0.5586210781338053, 0.41042248639907647],
-                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractor(path, [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]], 
+    #                             [1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297],
+    #                             [0.09083497075483686,  0.29233367103037566, 0.4101351666476082, 0.3656859134027069],
+    #                             ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 def m2_coefficients(device=None):
     '''
@@ -1057,13 +1080,14 @@ def m2_coefficients(device=None):
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion/m2/')
-    return CoefficientExtractor(path, [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]], 
-                                [12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353],
-                                [ 1.255806866193107, 5.049545544384645, 5.760223014440548, 3.8609340187976002],
-                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractor(path, [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]], 
+    #                             [12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518],
+    #                             [0.8943669296845979, 3.6988180667458797, 4.581255912025152, 3.489828958880325],
+    #                             ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 def m3_coefficients(device=None):
     '''
@@ -1074,13 +1098,14 @@ def m3_coefficients(device=None):
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion/m3/')
-    return CoefficientExtractor(path, [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]], 
-                                [209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ],
-                                [29.214223064239675, 105.02775007458423, 75.45394645670979,  44.646118060351654],
-                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractor(path, [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]], 
+    #                             [204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719],
+    #                             [21.02327059669788, 81.32863683647228, 66.80020511370267,  38.107797462487774],
+    #                             ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 def v_coefficients(device=None):
     '''
@@ -1091,57 +1116,70 @@ def v_coefficients(device=None):
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion/v/')
-    return CoefficientExtractor(path, [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]], 
-                                [6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934],
-                                [0.399302284970174, 1.048545480933507, 1.0702473171989684, 0.8387921252405294],
-                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractor(path, [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]], 
+    #                             [5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762],
+    #                             [0.28705711113029336, 0.8573275930561899, 0.8568476107305737, 0.6390083426260285],
+    #                             ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 def m1_coefficients_CC(device=None):
     '''
     Return the constant coefficients M1
     Use compute_from_ase for this
     '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    return CoefficientExtractorCC([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436],
-                                  [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
-                                  ani_model.species_to_tensor, torch.float32, device)
+    path = os.path.join(torchani_dir, 'resources/dispersion/m1/')
+    return CoefficientExtractorCC._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractorCC([1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297],
+    #                               [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
+    #                               ani_model.species_to_tensor, torch.float32, device)
 
 def m2_coefficients_CC(device=None):
     '''
     Return the constant coefficients M2
     Use compute_from_ase for this
     '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    return CoefficientExtractorCC([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353],
-                                  [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
-                                  ani_model.species_to_tensor, torch.float32, device)
+    path = os.path.join(torchani_dir, 'resources/dispersion/m2/')
+    return CoefficientExtractorCC._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractorCC([12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518],
+    #                               [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
+    #                               ani_model.species_to_tensor, torch.float32, device)
 
 def m3_coefficients_CC(device=None):
     '''
     Return the constant coefficients M3
     Use compute_from_ase for this
     '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    return CoefficientExtractorCC([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ],
-                                  [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
-                                  ani_model.species_to_tensor, torch.float32, device)
+    path = os.path.join(torchani_dir, 'resources/dispersion/m3/')
+    return CoefficientExtractorCC._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractorCC([204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719],
+    #                               [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
+    #                               ani_model.species_to_tensor, torch.float32, device)
 
 def v_coefficients_CC(device=None):
     '''
     Return the constant coefficients V
     Use compute_from_ase for this
     '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    return CoefficientExtractorCC([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934],
-                                  [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
-                                  ani_model.species_to_tensor, torch.float32, device)
+    path = os.path.join(torchani_dir, 'resources/dispersion/v/')
+    return CoefficientExtractorCC._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    # return CoefficientExtractorCC([5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762],
+    #                               [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
+    #                               ani_model.species_to_tensor, torch.float32, device)
 
 def pairwise_energy_extractor(device=None):
     '''
@@ -1152,30 +1190,34 @@ def pairwise_energy_extractor(device=None):
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion/')
-    m1_net = CoefficientLayer([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436],
-                              [0.13029707571933283,  0.41856823837780816, 0.5586210781338053, 0.41042248639907647])
-    m2_net = CoefficientLayer([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353],
-                              [ 1.255806866193107, 5.049545544384645, 5.760223014440548, 3.8609340187976002])
-    m3_net = CoefficientLayer([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ],
-                              [29.214223064239675, 105.02775007458423, 75.45394645670979,  44.646118060351654])
-    v_net = CoefficientLayer([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934],
-                              [0.399302284970174, 1.048545480933507, 1.0702473171989684, 0.8387921252405294])
-    m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
+    # m1_net = CoefficientLayer([1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297],
+    #                           [0.09083497075483686,  0.29233367103037566, 0.4101351666476082, 0.3656859134027069], device=device)
+    # m2_net = CoefficientLayer([12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518],
+    #                           [0.8943669296845979, 3.6988180667458797, 4.581255912025152, 3.489828958880325], device=device)
+    # m3_net = CoefficientLayer([204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719],
+    #                           [21.02327059669788, 81.32863683647228, 66.80020511370267,  38.107797462487774], device=device)
+    # v_net = CoefficientLayer([5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762],
+    #                           [0.28705711113029336, 0.8573275930561899, 0.8568476107305737, 0.6390083426260285], device=device)
+    # m1_net._from_file(f'{path}m1/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m2_net._from_file(f'{path}m2/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # m3_net._from_file(f'{path}m3/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    # v_net._from_file(f'{path}v/', [[384, 160, 128, 96],
+    #                                    [384, 144, 112, 96],
+    #                                    [384, 128, 112, 96],
+    #                                    [384, 128, 112, 96]])
+    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
     return EnergyExtractor(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
                             0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
@@ -1186,20 +1228,26 @@ def pairwise_energy_CC_extractor(device=None):
     Return the extractor for pairwise interaction of systems with constant coefficients M1, M2, M3, V
     The output is a set of: atom index, distance, c6 energy pair, c8 energy pair, c10 energy pair
     '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    path = os.path.join(torchani_dir, 'resources/dispersion/')
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
-    m1_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    m2_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    m3_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    v_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0], device=device)
-    m1_net._from_constants([1.5521718925584906, 4.353411008323642, 4.675248065790355, 4.849301811910436])
-    m2_net._from_constants([12.573793408100467, 55.21861598056402, 45.435379931770946, 37.47955260155353])
-    m3_net._from_constants([209.14914031103308, 987.2309040863673, 598.2206374338459, 383.4754663313882 ])
-    v_net._from_constants([6.028339844842694, 31.557799964153084, 26.206361992075443, 21.823065978642934])
+    # m1_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # m2_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # m3_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # v_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0],
+    #                           [1.0, 1.0, 1.0, 1.0], device=device)
+    # m1_net._from_constants([1.5454423994045836, 4.326623496615965, 4.724500460580538, 4.896044785397297])
+    # m2_net._from_constants([12.429686652457173, 55.139854254590226, 45.72367375750058, 37.17258577804518])
+    # m3_net._from_constants([204.9550744126819, 972.3025242098519, 594.1183364445442, 375.3308576768719])
+    # v_net._from_constants([5.962841164667986, 31.524820808211476, 26.330457103336006, 21.75686369255762])
+    m1_net = CoefficientLayer._from_constants_2(f'{path}m1/', dtype=torch.float32, device=device)
+    m2_net = CoefficientLayer._from_constants_2(f'{path}m2/', dtype=torch.float32, device=device)
+    m3_net = CoefficientLayer._from_constants_2(f'{path}m3/', dtype=torch.float32, device=device)
+    v_net = CoefficientLayer._from_constants_2(f'{path}v/', dtype=torch.float32, device=device)
     return EnergyExtractor(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
                             0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335], 
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 

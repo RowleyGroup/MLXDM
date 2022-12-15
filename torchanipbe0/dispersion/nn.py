@@ -219,6 +219,28 @@ class CoefficientLayer(nn.Module):
         checkpoint = torch.load(os.path.join(path,'best.pt'), map_location=torch.device('cpu'))
         self.neural_networks.load_state_dict(checkpoint)
         self.neural_networks = self.neural_networks.to(self.device)
+    
+    @classmethod
+    def _from_file_2(cls, path, dtype=None, device=None):
+        f = open(os.path.join(path, 'best.param'), 'r')
+        lines = f.readlines()
+        f.close()
+        n = int(lines[0][:-1])
+        b0_list = lines[1].split()
+        b0_list = list(map(float, b0_list))
+        b1_list = lines[2].split()
+        b1_list = list(map(float, b1_list))
+        dimensions = []
+        for i in range(3, n+3):
+            dimension = lines[i].split()
+            dimension = list(map(int, dimension))
+            dimensions.append(dimension)
+        new_layer = cls(b0_list, b1_list, dtype=dtype, device=device)
+        new_layer.neural_networks = cls._create_model(dimensions)
+        checkpoint = torch.load(os.path.join(path, 'best.pt'), map_location=torch.device('cpu'))
+        new_layer.neural_networks.load_state_dict(checkpoint)
+        new_layer.neural_networks = new_layer.neural_networks.to(device)
+        return new_layer
 
     def _from_constants(self, data):
         '''
@@ -228,6 +250,20 @@ class CoefficientLayer(nn.Module):
                                                 ConstantLayer(data[1], self.dtype, self.device),
                                                 ConstantLayer(data[2], self.dtype, self.device),
                                                 ConstantLayer(data[3], self.dtype, self.device)])
+
+    @classmethod
+    def _from_constants_2(cls, path, dtype=None, device=None):
+        f = open(os.path.join(path, 'best.param'), 'r')
+        lines = f.readlines()
+        f.close()
+        n = int(lines[0][:-1])
+        b0_list = lines[1].split()
+        b0_list = list(map(float, b0_list))
+        # b1_list = lines[2].split()
+        # b1_list = list(map(float, b1_list))
+        new_layer = cls([0.0]*n, [1.0]*n, dtype=dtype, device=device)
+        new_layer._from_constants(b0_list)
+        return new_layer
 
     def forward(self, species_aev):
         x = self.neural_networks(species_aev)
@@ -456,6 +492,8 @@ class CoefficientExtractor(nn.Module):
     def __init__(self, info_file_path, dimensions, b0_list, b1_list, 
                  aev_computer, species_to_tensor, dtype, device):
         super().__init__()
+        if info_file_path is None:
+            return
         self.model = CoefficientLayer(b0_list, b1_list, dtype, device)
         self.model._from_file(info_file_path, dimensions)
         self.model = self.model.to(device)
@@ -464,6 +502,17 @@ class CoefficientExtractor(nn.Module):
         self.device = device
         self.species_to_tensor = species_to_tensor
     
+    @classmethod
+    def _from_file(cls, path, aev_computer, species_to_tensor, dtype=None, device=None):
+        new_layer = CoefficientLayer._from_file_2(path, dtype=dtype, device=device)
+        new_extractor = cls(None, None, None, None, None, None, None, None)
+        new_extractor.model = new_layer.to(device)
+        new_extractor.aev_computer = aev_computer
+        new_extractor.dtype = dtype
+        new_extractor.device = device
+        new_extractor.species_to_tensor = species_to_tensor
+        return new_extractor
+
     def forward(self, species_coordinates, cell=None, pbc=None):
         species_aev = self.aev_computer(species_coordinates, cell, pbc)
         return self.model(species_aev)
@@ -490,6 +539,8 @@ class CoefficientExtractorCC(nn.Module):
     '''
     def __init__(self, constants, b0_list, b1_list, aev_computer, species_to_tensor, dtype, device):
         super().__init__()
+        if constants is None:
+            return
         self.model = CoefficientLayer(b0_list, b1_list, dtype, device)
         self.model._from_constants(constants)
         self.model = self.model.to(device)
@@ -497,6 +548,17 @@ class CoefficientExtractorCC(nn.Module):
         self.dtype = dtype
         self.device = device
         self.species_to_tensor = species_to_tensor
+
+    @classmethod
+    def _from_file(cls, path, aev_computer, species_to_tensor, dtype=None, device=None):
+        new_layer = CoefficientLayer._from_constants_2(path, dtype=dtype, device=device)
+        new_extractor = cls(None, None, None, None, None, None, None)
+        new_extractor.model = new_layer.to(device)
+        new_extractor.aev_computer = aev_computer
+        new_extractor.dtype = dtype
+        new_extractor.device = device
+        new_extractor.species_to_tensor = species_to_tensor
+        return new_extractor
 
     def forward(self, species_coordinates, cell=None, pbc=None):
         species_aev = self.aev_computer(species_coordinates, cell, pbc)
