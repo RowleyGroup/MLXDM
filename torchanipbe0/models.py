@@ -530,6 +530,16 @@ def ANIPBE0(periodic_table_index = None, model_index = None):
         return BuiltinEnsemble2._from_neurochem_resources(info_file, periodic_table_index)
     return BuiltinModel2._from_neurochem_resources(info_file, periodic_table_index, model_index)
 
+def ANIPBE02x(periodic_table_index = None, model_index = None):
+    '''                                                                                                                                                                                                     
+    Return the TorchANI model to predict PBE0 functional energy                                                                                                                                             
+    '''
+    info_file = 'anipbe0-2x_8x.info'
+    if model_index is None:
+        return BuiltinEnsemble2._from_neurochem_resources(info_file, periodic_table_index)
+    return BuiltinModel2._from_neurochem_resources(info_file, periodic_table_index, model_index)
+
+
 def XDM_CC_simple(device = None):
     '''
     Return the dispersion model with constant dispersion coefficient for all elements
@@ -594,6 +604,23 @@ def XDM_CC(device = None):
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
                             14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
 
+def XDM_2x_CC(device = None):
+    '''                                                                                                                                                                                                     
+    Return XDM model with constants parameters for M1, M2, M3 and V                                                                                                                                         
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    path = os.path.join(torchani_dir, 'resources/dispersion/')
+    ani_model = ANIPBE0()
+    ani_model = ani_model.to(device)
+    m1_net = CoefficientLayer._from_constants_2(f'{path}m1/', dtype=torch.float32, device=device)
+    m2_net = CoefficientLayer._from_constants_2(f'{path}m2/', dtype=torch.float32, device=device)
+    m3_net = CoefficientLayer._from_constants_2(f'{path}m3/', dtype=torch.float32, device=device)
+    v_net = CoefficientLayer._from_constants_2(f'{path}v/', dtype=torch.float32, device=device)
+    return DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335],
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436],
+                            14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'F', 'S', 'Cl'])
+
 def MLXDM(device=None):
     '''
     Main MLXDM model
@@ -611,6 +638,24 @@ def MLXDM(device=None):
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
                             14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
 
+def MLXDM_2x(device=None):
+    '''                                                                                                                                                                                                     
+    Main MLXDM model                                                                                                                                                                                        
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    path = os.path.join(torchani_dir, 'resources/dispersion_2x/')
+    ani_model = ANIPBE0_2x()
+    ani_model = ani_model.to(device)
+    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
+    return DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335],
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436],
+                            14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'F', 'S', 'Cl'])
+
+
 # Combine
 
 def ANIPBE0_MLXDM(device=None):
@@ -620,6 +665,15 @@ def ANIPBE0_MLXDM(device=None):
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
     dispersion_model = MLXDM(device)
+    return ANIDispersion(ani_model, dispersion_model)
+
+def ANIPBE02x_MLXDM(device=None):
+    '''                                                                                                                                                                                                     
+    The main model with ANIPBE0 and MLXDM                                                                                                                                                                   
+    '''
+    ani_model = ANIPBE02x()
+    ani_model = ani_model.to(device)
+    dispersion_model = MLXDM_2x(device)
     return ANIDispersion(ani_model, dispersion_model)
 
 def ANI1x_MLXDM(device=None):
@@ -674,6 +728,15 @@ def ANIPBE0_XDM_CC(device=None):
     ani_model = ANIPBE0()
     ani_model = ani_model.to(device)
     dispersion_model = XDM_CC(device)
+    return ANIDispersion(ani_model, dispersion_model)
+
+def ANIPBE02x_XDM_CC(device=None):
+    '''                                                                                                                                                                                                     
+    ANIPBE02x with the constant M1, M2, M3 and V coefficients XDM                                                                                                                                             
+    '''
+    ani_model = ANIPBE02x()
+    ani_model = ani_model.to(device)
+    dispersion_model = XDM_2x_CC(device)
     return ANIDispersion(ani_model, dispersion_model)
 
 def ANI1x_XDM_CC(device=None):
