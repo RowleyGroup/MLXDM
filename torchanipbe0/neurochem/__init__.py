@@ -336,6 +336,86 @@ def load_model_ensemble_2(prefix, count, aev_dim):
         models.append(load_model_2(f'{prefix}{i}', aev_dim))
     return Ensemble(models)
 
+def load_model_3(dir_, aev_dim):
+    # Load the network with different architecture for each atoms
+
+    H_network = torch.nn.Sequential(
+        torch.nn.Linear(aev_dim, 256),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(256, 192),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(192, 160),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(160, 1),
+    )
+    C_network = torch.nn.Sequential(
+        torch.nn.Linear(aev_dim, 224),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(224, 192),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(192, 160),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(160, 1)
+    )
+    N_network = torch.nn.Sequential(
+        torch.nn.Linear(aev_dim, 192),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(192, 160),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(160, 128),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(128, 1)
+    )
+    O_network = torch.nn.Sequential(
+        torch.nn.Linear(aev_dim, 192),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(192, 160),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(160, 128),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(128, 1)
+    )
+    F_network = torch.nn.Sequential(
+        torch.nn.Linear(aev_dim, 160),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(160, 128),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(128, 96),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(96, 1)
+    )
+    S_network = torch.nn.Sequential(
+        torch.nn.Linear(aev_dim, 160),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(160, 128),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(128, 96),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(96, 1)
+    )
+    Cl_network = torch.nn.Sequential(
+        torch.nn.Linear(aev_dim, 160),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(160, 128),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(128, 96),
+        torch.nn.CELU(0.1),
+        torch.nn.Linear(96, 1)
+    )
+
+    # Load the module without the label
+    nn = ANIModel([H_network, C_network, N_network, O_network, S_network, F_network, Cl_network])
+    checkpoint = torch.load(os.path.join(dir_,'best.pt'), map_location=torch.device('cpu'))
+    nn.load_state_dict(checkpoint)
+    return nn
+    
+def load_model_ensemble_3(prefix, count, aev_dim):
+    models = []
+    for i in range(count):
+        models.append(load_model_3(f'{prefix}{i}', aev_dim))
+    return Ensemble(models)
+
+
 # The modification END HERE
 
 if sys.version_info[0] > 2:

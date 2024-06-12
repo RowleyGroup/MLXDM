@@ -34,9 +34,8 @@ from torch import Tensor
 from typing import Tuple, Optional, NamedTuple
 from .nn import SpeciesConverter, SpeciesEnergies
 from .aev import AEVComputer
-from .dispersion.nn import ANIDispersion, CoefficientExtractorCC, DispersionLayer, DispersionSimpleLayer, CoefficientLayer
+from .dispersion.nn import ANIDispersion, CoefficientExtractorCC, DispersionLayer, CoefficientLayer
 from .dispersion.nn import C6DispersionLayer, C8DispersionLayer, C10DispersionLayer
-from .dispersion.nn import C6DispersionSimpleLayer, C8DispersionSimpleLayer, C10DispersionSimpleLayer
 from .dispersion.nn import EnergyExtractor, CoefficientExtractor, CoefficientExtractorCC
 from pathlib import Path
 
@@ -519,6 +518,59 @@ class BuiltinEnsemble2(BuiltinEnsemble):
         return cls(species_converter, aev_computer, neural_networks,
                    energy_shifter, species_to_tensor, consts, sae_dict, periodic_table_index)
 
+class BuiltinModel3(BuiltinModel):
+    '''
+    Update from BuiltinModel to allow different model load
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def _from_neurochem_resources(cls, info_file_path, periodic_table_index=False, model_index=0):
+        # Rewrite load model to load from best.pt file
+        from . import neurochem
+        const_file, sae_file, ensemble_prefix, ensemble_size = neurochem.parse_neurochem_resources(info_file_path)
+        if (model_index >= ensemble_size):
+            raise ValueError("The ensemble size is only {}, model {} can't be loaded".format(ensemble_size, model_index))
+
+        consts = neurochem.Constants(const_file)
+        species_converter = SpeciesConverter(consts.species)
+        aev_computer = AEVComputer(**consts)
+        energy_shifter, sae_dict = neurochem.load_sae(sae_file, return_dict=True)
+        species_to_tensor = consts.species_to_tensor
+
+        aev_dim = aev_computer.aev_length
+        network_dir = f'{ensemble_prefix}{model_index}'
+        neural_networks = neurochem.load_model_3(network_dir, aev_dim)
+
+        return cls(species_converter, aev_computer, neural_networks,
+                   energy_shifter, species_to_tensor, consts, sae_dict, periodic_table_index)
+
+class BuiltinEnsemble3(BuiltinEnsemble):
+    '''
+    Update from BuiltinEnsemble to allow different model load
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def _from_neurochem_resources(cls, info_file_path, periodic_table_index=False):
+        # Rewrite to load model from best.pt
+        from . import neurochem
+        const_file, sae_file, ensemble_prefix, ensemble_size = neurochem.parse_neurochem_resources(info_file_path)
+        consts = neurochem.Constants(const_file)
+
+        species_converter = SpeciesConverter(consts.species)
+        aev_computer = AEVComputer(**consts)
+        energy_shifter, sae_dict = neurochem.load_sae(sae_file, return_dict=True)
+        species_to_tensor = consts.species_to_tensor
+
+        aev_dim = aev_computer.aev_length
+        neural_networks = neurochem.load_model_ensemble_3(ensemble_prefix, ensemble_size, aev_dim)
+
+        return cls(species_converter, aev_computer, neural_networks,
+                   energy_shifter, species_to_tensor, consts, sae_dict, periodic_table_index)
+
 # Elemental model
 
 def ANIPBE0(periodic_table_index = None, model_index = None):
@@ -530,62 +582,14 @@ def ANIPBE0(periodic_table_index = None, model_index = None):
         return BuiltinEnsemble2._from_neurochem_resources(info_file, periodic_table_index)
     return BuiltinModel2._from_neurochem_resources(info_file, periodic_table_index, model_index)
 
-def ANIPBE02x(periodic_table_index = None, model_index = None):
+def ANIPBE0_2x(periodic_table_index = None, model_index = None):
     '''                                                                                                                                                                                                     
     Return the TorchANI model to predict PBE0 functional energy                                                                                                                                             
     '''
-    info_file = 'anipbe0-2x_8x.info'
+    info_file = 'ani-pbe0-2x_8x.info'
     if model_index is None:
-        return BuiltinEnsemble2._from_neurochem_resources(info_file, periodic_table_index)
-    return BuiltinModel2._from_neurochem_resources(info_file, periodic_table_index, model_index)
-
-
-def XDM_CC_simple(device = None):
-    '''
-    Return the dispersion model with constant dispersion coefficient for all elements
-    '''
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    c6_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], device=device)
-    c8_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                              [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], device=device)
-    c10_net = CoefficientLayer([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                               [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], device=device)
-    c6_net._from_constants([2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233])
-    c8_net._from_constants([60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626])
-    c10_net._from_constants([2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642])
-    return DispersionSimpleLayer(ani_model.aev_computer, c6_net, c8_net, c10_net,
-                           0.4186, 2.6791, 14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
-
-def MLXDM_simple(device=None):
-    '''
-    Return the MLXDM model with atomic C6, C8 and C10 coefficients and geometric combination rules
-    '''
-    torchani_dir = Path(__file__).resolve().parent.as_posix()
-    path = os.path.join(torchani_dir, 'resources/dispersion/')
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    c6_net = CoefficientLayer([2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233],
-                              [0.20894301395856424, 1.4590016624541282, 1.8738488642622464, 1.224105161636984], device=device)
-    c8_net = CoefficientLayer([60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626],
-                              [6.0737109984570985, 62.200168506367056, 60.73042587155412, 33.13683091496654], device=device)
-    c10_net = CoefficientLayer([2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642],
-                               [257.49041066441407, 3266.5763911897166, 2009.8906257122967, 863.8261589061798], device=device)
-    c6_net._from_file(f'{path}c6/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c8_net._from_file(f'{path}c8/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c10_net._from_file(f'{path}c10/', [[384, 160, 128, 96],
-                                         [384, 144, 112, 96],
-                                         [384, 128, 112, 96],
-                                         [384, 128, 112, 96]])
-    return DispersionSimpleLayer(ani_model.aev_computer, c6_net, c8_net, c10_net,
-                           0.4186, 2.6791, 14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
+        return BuiltinEnsemble3._from_neurochem_resources(info_file, periodic_table_index)
+    return BuiltinModel3._from_neurochem_resources(info_file, periodic_table_index, model_index)
 
 def XDM_CC(device = None):
     '''
@@ -609,17 +613,17 @@ def XDM_2x_CC(device = None):
     Return XDM model with constants parameters for M1, M2, M3 and V                                                                                                                                         
     '''
     torchani_dir = Path(__file__).resolve().parent.as_posix()
-    path = os.path.join(torchani_dir, 'resources/dispersion/')
-    ani_model = ANIPBE0()
+    path = os.path.join(torchani_dir, 'resources/dispersion_2x/')
+    ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     m1_net = CoefficientLayer._from_constants_2(f'{path}m1/', dtype=torch.float32, device=device)
     m2_net = CoefficientLayer._from_constants_2(f'{path}m2/', dtype=torch.float32, device=device)
     m3_net = CoefficientLayer._from_constants_2(f'{path}m3/', dtype=torch.float32, device=device)
     v_net = CoefficientLayer._from_constants_2(f'{path}v/', dtype=torch.float32, device=device)
     return DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
-                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335],
-                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436],
-                            14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'F', 'S', 'Cl'])
+                            0.4186, 2.6791, [4.4997895, 11.87706887, 7.42316804, 5.41216434, 19.57017029, 3.75882236, 14.71136939],
+                            [8.2794385587230224, 35.403450375407488, 26.774856262986901, 22.577665436425793, 75.344227406670839, 18.604506038051770, 65.219744182377752],
+                            14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
 
 def MLXDM(device=None):
     '''
@@ -646,14 +650,14 @@ def MLXDM_2x(device=None):
     path = os.path.join(torchani_dir, 'resources/dispersion_2x/')
     ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
-    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
-    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
-    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
-    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
+    m1_net = CoefficientLayer._from_file_3(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_3(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_3(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_3(f'{path}v/', device=device)
     return DispersionLayer(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
-                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335],
-                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436],
-                            14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'F', 'S', 'Cl'])
+                            0.4186, 2.6791, [4.4997895, 11.87706887, 7.42316804, 5.41216434, 19.57017029, 3.75882236, 14.71136939],
+                            [8.2794385587230224, 35.403450375407488, 26.774856262986901, 22.577665436425793, 75.344227406670839, 18.604506038051770, 65.219744182377752],
+                            14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
 
 
 # Combine
@@ -667,11 +671,11 @@ def ANIPBE0_MLXDM(device=None):
     dispersion_model = MLXDM(device)
     return ANIDispersion(ani_model, dispersion_model)
 
-def ANIPBE02x_MLXDM(device=None):
+def ANIPBE0_2x_MLXDM_2x(device=None):
     '''                                                                                                                                                                                                     
-    The main model with ANIPBE0 and MLXDM                                                                                                                                                                   
+    The model with ANIPBE0_2x and MLXDM_2x                                                                                                                                                                   
     '''
-    ani_model = ANIPBE02x()
+    ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     dispersion_model = MLXDM_2x(device)
     return ANIDispersion(ani_model, dispersion_model)
@@ -694,33 +698,6 @@ def ANI1ccx_MLXDM(device=None):
     dispersion_model = MLXDM(device)
     return ANIDispersion(ani_model, dispersion_model)
 
-def ANIPBE0_MLXDM_simple(device=None):
-    '''
-    ANIPBE0 with the MLXDM with atomic C6, C8 and C10
-    '''
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    dispersion_model = MLXDM_simple(device)
-    return ANIDispersion(ani_model, dispersion_model)
-
-def ANI1x_MLXDM_simple(device=None):
-    '''
-    ANI1x with the MLXDM with atomic C6, C8 and C10
-    '''
-    ani_model = ANI1x()
-    ani_model = ani_model.to(device)
-    dispersion_model = MLXDM_simple(device)
-    return ANIDispersion(ani_model, dispersion_model)
-
-def ANI1ccx_MLXDM_simple(device=None):
-    '''
-    ANI1ccx with the MLXDM with atomic C6, C8 and C10
-    '''
-    ani_model = ANI1ccx()
-    ani_model = ani_model.to(device)
-    dispersion_model = MLXDM_simple(device)
-    return ANIDispersion(ani_model, dispersion_model)
-
 def ANIPBE0_XDM_CC(device=None):
     '''
     ANIPBE0 with the constant M1, M2, M3 and V coefficients XDM
@@ -730,11 +707,11 @@ def ANIPBE0_XDM_CC(device=None):
     dispersion_model = XDM_CC(device)
     return ANIDispersion(ani_model, dispersion_model)
 
-def ANIPBE02x_XDM_CC(device=None):
+def ANIPBE0_2x_XDM_2x_CC(device=None):
     '''                                                                                                                                                                                                     
     ANIPBE02x with the constant M1, M2, M3 and V coefficients XDM                                                                                                                                             
     '''
-    ani_model = ANIPBE02x()
+    ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     dispersion_model = XDM_2x_CC(device)
     return ANIDispersion(ani_model, dispersion_model)
@@ -755,33 +732,6 @@ def ANI1ccx_XDM_CC(device=None):
     ani_model = ANI1ccx()
     ani_model = ani_model.to(device)
     dispersion_model = XDM_CC(device)
-    return ANIDispersion(ani_model, dispersion_model)
-
-def ANIPBE0_XDM_CC_simple(device=None):
-    '''
-    ANIPBE0 with the constant C6, C8 and C10 coefficients XDM
-    '''
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    dispersion_model = XDM_CC_simple(device)
-    return ANIDispersion(ani_model, dispersion_model)
-
-def ANI1x_XDM_CC_simple(device=None):
-    '''
-    ANI1x with the constant M1, M2, M3 and V coefficients XDM
-    '''
-    ani_model = ANI1x()
-    ani_model = ani_model.to(device)
-    dispersion_model = XDM_CC_simple(device)
-    return ANIDispersion(ani_model, dispersion_model)
-
-def ANI1ccx_XDM_CC_simple(device=None):
-    '''
-    ANI1ccx with the constant M1, M2, M3 and V coefficients XDM
-    '''
-    ani_model = ANI1ccx()
-    ani_model = ani_model.to(device)
-    dispersion_model = XDM_CC_simple(device)
     return ANIDispersion(ani_model, dispersion_model)
 
 # Dispersion coefficients and energy extration
@@ -837,176 +787,6 @@ def c10_energy(device = None):
                             [8.2794385587, 35.403450375, 26.774856263, 22.577665436], 
                             14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
 
-def c6_simple_energy(device = None):
-    '''
-    Return the dispersion energy prediction in geometric combination rule for 6th order components only
-    '''
-    torchani_dir = Path(__file__).resolve().parent.as_posix()
-    path = os.path.join(torchani_dir, 'resources/dispersion/')
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    c6_net = CoefficientLayer([2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233],
-                              [0.20894301395856424, 1.4590016624541282, 1.8738488642622464, 1.224105161636984], device=device)
-    c8_net = CoefficientLayer([60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626],
-                              [6.0737109984570985, 62.200168506367056, 60.73042587155412, 33.13683091496654], device=device)
-    c10_net = CoefficientLayer([2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642],
-                               [257.49041066441407, 3266.5763911897166, 2009.8906257122967, 863.8261589061798], device=device)
-    c6_net._from_file(f'{path}c6/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c8_net._from_file(f'{path}c8/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c10_net._from_file(f'{path}c10/', [[384, 160, 128, 96],
-                                         [384, 144, 112, 96],
-                                         [384, 128, 112, 96],
-                                         [384, 128, 112, 96]])
-    return C6DispersionSimpleLayer(ani_model.aev_computer, c6_net, c8_net, c10_net,
-                           0.4186, 2.6791, 14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
-
-def c8_simple_energy(device = None):
-    '''
-    Return the dispersion energy prediction in geometric combination rule for 8th order components only
-    '''
-    torchani_dir = Path(__file__).resolve().parent.as_posix()
-    path = os.path.join(torchani_dir, 'resources/dispersion/')
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    c6_net = CoefficientLayer([2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233],
-                              [0.20894301395856424, 1.4590016624541282, 1.8738488642622464, 1.224105161636984], device=device)
-    c8_net = CoefficientLayer([60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626],
-                              [6.0737109984570985, 62.200168506367056, 60.73042587155412, 33.13683091496654], device=device)
-    c10_net = CoefficientLayer([2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642],
-                               [257.49041066441407, 3266.5763911897166, 2009.8906257122967, 863.8261589061798], device=device)
-    c6_net._from_file(f'{path}c6/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c8_net._from_file(f'{path}c8/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c10_net._from_file(f'{path}c10/', [[384, 160, 128, 96],
-                                         [384, 144, 112, 96],
-                                         [384, 128, 112, 96],
-                                         [384, 128, 112, 96]])
-    return C8DispersionSimpleLayer(ani_model.aev_computer, c6_net, c8_net, c10_net,
-                           0.4186, 2.6791, 14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
-
-def c10_simple_energy(device = None):
-    '''
-    Return the dispersion energy prediction in geometric combination rule for 10th order components only
-    '''
-    torchani_dir = Path(__file__).resolve().parent.as_posix()
-    path = os.path.join(torchani_dir, 'resources/dispersion/')
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    c6_net = CoefficientLayer([2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233],
-                              [0.20894301395856424, 1.4590016624541282, 1.8738488642622464, 1.224105161636984], device=device)
-    c8_net = CoefficientLayer([60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626],
-                              [6.0737109984570985, 62.200168506367056, 60.73042587155412, 33.13683091496654], device=device)
-    c10_net = CoefficientLayer([2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642],
-                               [257.49041066441407, 3266.5763911897166, 2009.8906257122967, 863.8261589061798], device=device)
-    c6_net._from_file(f'{path}c6/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c8_net._from_file(f'{path}c8/', [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]])
-    c10_net._from_file(f'{path}c10/', [[384, 160, 128, 96],
-                                         [384, 144, 112, 96],
-                                         [384, 128, 112, 96],
-                                         [384, 128, 112, 96]])
-    return C10DispersionSimpleLayer(ani_model.aev_computer, c6_net, c8_net, c10_net,
-                           0.4186, 2.6791, 14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
-
-def c6_coefficients(device=None):
-    '''
-    Return the coefficients C6 from the combination rules model
-    Use compute_from_ase for this
-    '''
-    torchani_dir = Path(__file__).resolve().parent.as_posix()
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    path = os.path.join(torchani_dir, 'resources/dispersion/c6/')
-    return CoefficientExtractor(path, [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]],
-                                [2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233],
-                                [0.20894301395856424, 1.4590016624541282, 1.8738488642622464, 1.224105161636984],
-                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
-
-def c8_coefficients(device=None):
-    '''
-    Return the coefficients C8 from the combination rules model
-    Use compute_from_ase for this
-    '''
-    torchani_dir = Path(__file__).resolve().parent.as_posix()
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    path = os.path.join(torchani_dir, 'resources/dispersion/c8/')
-    return CoefficientExtractor(path, [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]],
-                                [60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626],
-                                [6.0737109984570985, 62.200168506367056, 60.73042587155412, 33.13683091496654],
-                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
-                                
-def c10_coefficients(device=None):
-    '''
-    Return the coefficients C10 from the combination rules model
-    Use compute_from_ase for this
-    '''
-    torchani_dir = Path(__file__).resolve().parent.as_posix()
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    path = os.path.join(torchani_dir, 'resources/dispersion/c10/')
-    return CoefficientExtractor(path, [[384, 160, 128, 96],
-                                       [384, 144, 112, 96],
-                                       [384, 128, 112, 96],
-                                       [384, 128, 112, 96]],
-                                [2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642],
-                                [257.49041066441407, 3266.5763911897166, 2009.8906257122967, 863.8261589061798],
-                                ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
-
-def c6_coefficients_CC(device=None):
-    '''
-    Return the constant coefficients C6 from the combination rules model
-    Use compute_from_ase for this
-    '''
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    return CoefficientExtractorCC([2.5053229253887226, 22.462900764773437, 17.05021785931179, 12.57621125300233],
-                                  [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
-                                  ani_model.species_to_tensor, torch.float32, device)
-
-def c8_coefficients_CC(device=None):
-    '''
-    Return the constant coefficients C8 from the combination rules model
-    Use compute_from_ase for this
-    '''
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    return CoefficientExtractorCC([60.48611719044784, 858.2971024155167, 498.17411788889984, 287.71613578539626],
-                                  [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
-                                  ani_model.species_to_tensor, torch.float32, device)
-
-def c10_coefficients_CC(device=None):
-    '''
-    Return the constant coefficients C10 from the combination rules model
-    Use compute_from_ase for this
-    '''
-    ani_model = ANIPBE0()
-    ani_model = ani_model.to(device)
-    return CoefficientExtractorCC([2018.003824706439, 35704.907820392655, 15418.428201717945, 6977.32928015642],
-                                  [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0], ani_model.aev_computer,
-                                  ani_model.species_to_tensor, torch.float32, device)
 
 def m1_coefficients(device=None):
     '''
@@ -1051,6 +831,52 @@ def v_coefficients(device=None):
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion/v/')
     return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
+
+def m1_2x_coefficients(device=None):
+    '''
+    Return the coefficients M1
+    Use compute_from_ase for this
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = ANIPBE0()
+    ani_model = ani_model.to(device)
+    path = os.path.join(torchani_dir, 'resources/dispersion_2x/m1/')
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
+def m2_2x_coefficients(device=None):
+    '''
+    Return the coefficients M2
+    Use compute_from_ase for this
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = ANIPBE0()
+    ani_model = ani_model.to(device)
+    path = os.path.join(torchani_dir, 'resources/dispersion_2x/m2/')
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
+def m3_2x_coefficients(device=None):
+    '''
+    Return the coefficients M3
+    Use compute_from_ase for this
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = ANIPBE0()
+    ani_model = ani_model.to(device)
+    path = os.path.join(torchani_dir, 'resources/dispersion_2x/m3/')
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
+def v_2x_coefficients(device=None):
+    '''
+    Return the coefficients V
+    Use compute_from_ase for this
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    ani_model = ANIPBE0()
+    ani_model = ani_model.to(device)
+    path = os.path.join(torchani_dir, 'resources/dispersion_2x/v/')
+    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+
 
 def m1_coefficients_CC(device=None):
     '''

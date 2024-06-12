@@ -211,6 +211,85 @@ class CoefficientLayer(nn.Module):
         )
         return DispersionModel([H_network, C_network, N_network, O_network])
 
+    @staticmethod
+    def _create_model_2(dimensions):
+        '''
+        Create a model with various architecture for different atomic type
+        Taking the user-defined dimensions
+        dimensions:   [7, 4]
+        '''
+        H_network = torch.nn.Sequential(
+            torch.nn.Linear(dimensions[0][0], dimensions[0][1]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[0][1], dimensions[0][2]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[0][2], dimensions[0][3]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[0][3], 1)
+        )
+
+        C_network = torch.nn.Sequential(
+            torch.nn.Linear(dimensions[1][0], dimensions[1][1]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[1][1], dimensions[1][2]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[1][2], dimensions[1][3]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[1][3], 1)
+        )
+
+        N_network = torch.nn.Sequential(
+            torch.nn.Linear(dimensions[2][0], dimensions[2][1]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[2][1], dimensions[2][2]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[2][2], dimensions[2][3]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[2][3], 1)
+        )
+
+        O_network = torch.nn.Sequential(
+            torch.nn.Linear(dimensions[3][0], dimensions[3][1]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[3][1], dimensions[3][2]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[3][2], dimensions[3][3]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[3][3], 1)
+        )
+
+        F_network = torch.nn.Sequential(
+            torch.nn.Linear(dimensions[4][0], dimensions[4][1]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[4][1], dimensions[4][2]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[4][2], dimensions[4][3]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[4][3], 1)
+        )
+
+        S_network = torch.nn.Sequential(
+            torch.nn.Linear(dimensions[5][0], dimensions[5][1]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[5][1], dimensions[5][2]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[5][2], dimensions[5][3]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[5][3], 1)
+        )
+
+        Cl_network = torch.nn.Sequential(
+            torch.nn.Linear(dimensions[6][0], dimensions[6][1]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[6][1], dimensions[6][2]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[6][2], dimensions[6][3]),
+            torch.nn.CELU(0.1),
+            torch.nn.Linear(dimensions[6][3], 1)
+        )
+
+        return DispersionModel([H_network, C_network, N_network, O_network, S_network, F_network, Cl_network])
+
     def _from_file(self, path, dimensions):
         '''
         Create the network with self-defined dimension, and load it from "best.pt" file in path
@@ -237,6 +316,28 @@ class CoefficientLayer(nn.Module):
             dimensions.append(dimension)
         new_layer = cls(b0_list, b1_list, dtype=dtype, device=device)
         new_layer.neural_networks = cls._create_model(dimensions)
+        checkpoint = torch.load(os.path.join(path, 'best.pt'), map_location=torch.device('cpu'))
+        new_layer.neural_networks.load_state_dict(checkpoint)
+        new_layer.neural_networks = new_layer.neural_networks.to(device)
+        return new_layer
+    
+    @classmethod
+    def _from_file_3(cls, path, dtype=None, device=None):
+        f = open(os.path.join(path, 'best.param'), 'r')
+        lines = f.readlines()
+        f.close()
+        n = int(lines[0][:-1])
+        b0_list = lines[1].split()
+        b0_list = list(map(float, b0_list))
+        b1_list = lines[2].split()
+        b1_list = list(map(float, b1_list))
+        dimensions = []
+        for i in range(3, n+3):
+            dimension = lines[i].split()
+            dimension = list(map(int, dimension))
+            dimensions.append(dimension)
+        new_layer = cls(b0_list, b1_list, dtype=dtype, device=device)
+        new_layer.neural_networks = cls._create_model_2(dimensions)
         checkpoint = torch.load(os.path.join(path, 'best.pt'), map_location=torch.device('cpu'))
         new_layer.neural_networks.load_state_dict(checkpoint)
         new_layer.neural_networks = new_layer.neural_networks.to(device)
