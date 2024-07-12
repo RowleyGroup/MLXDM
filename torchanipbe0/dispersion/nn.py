@@ -352,6 +352,18 @@ class CoefficientLayer(nn.Module):
                                                 ConstantLayer(data[2], self.dtype, self.device),
                                                 ConstantLayer(data[3], self.dtype, self.device)])
 
+    def _from_constants_2x(self, data):
+        '''                                                                                                                                                                                                                                                                                  
+        The model that return constant dispersion coefficients
+        '''
+        self.neural_networks = DispersionModel([ConstantLayer(data[0], self.dtype, self.device),
+                                                ConstantLayer(data[1], self.dtype, self.device),
+                                                ConstantLayer(data[2], self.dtype, self.device),
+                                                ConstantLayer(data[3], self.dtype, self.device),
+                                                ConstantLayer(data[4], self.dtype, self.device),
+                                                ConstantLayer(data[5], self.dtype, self.device),
+                                                ConstantLayer(data[6], self.dtype, self.device)])
+
     @classmethod
     def _from_constants_2(cls, path, dtype=None, device=None):
         f = open(os.path.join(path, 'best.param'), 'r')
@@ -363,7 +375,7 @@ class CoefficientLayer(nn.Module):
         # b1_list = lines[2].split()
         # b1_list = list(map(float, b1_list))
         new_layer = cls([0.0]*n, [1.0]*n, dtype=dtype, device=device)
-        new_layer._from_constants(b0_list)
+        new_layer._from_constants_2x(b0_list)
         return new_layer
 
     def forward(self, species_aev):
