@@ -352,6 +352,15 @@ class CoefficientLayer(nn.Module):
                                                 ConstantLayer(data[2], self.dtype, self.device),
                                                 ConstantLayer(data[3], self.dtype, self.device)])
 
+    def _from_constants_2x(self, data):
+        self.neural_networks = DispersionModel([ConstantLayer(data[0], self.dtype, self.device),
+                                                ConstantLayer(data[1], self.dtype, self.device),
+                                                ConstantLayer(data[2], self.dtype, self.device),
+                                                ConstantLayer(data[3], self.dtype, self.device),
+                                                ConstantLayer(data[4], self.dtype, self.device),
+                                                ConstantLayer(data[5], self.dtype, self.device),
+                                                ConstantLayer(data[6], self.dtype, self.device)])
+
     @classmethod
     def _from_constants_2(cls, path, dtype=None, device=None):
         f = open(os.path.join(path, 'best.param'), 'r')
