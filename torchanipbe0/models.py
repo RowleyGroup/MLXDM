@@ -833,16 +833,16 @@ def v_coefficients(device=None):
     return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 
-def m1_2x_coefficients(device=None):
+def m1_2x_coefficients(device=None): ##### HERE
     '''
     Return the coefficients M1
     Use compute_from_ase for this
     '''
     torchani_dir = Path(__file__).resolve().parent.as_posix()
-    ani_model = ANIPBE0()
+    ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion_2x/m1/')
-    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file_3(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 def m2_2x_coefficients(device=None):
     '''
@@ -850,10 +850,10 @@ def m2_2x_coefficients(device=None):
     Use compute_from_ase for this
     '''
     torchani_dir = Path(__file__).resolve().parent.as_posix()
-    ani_model = ANIPBE0()
+    ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion_2x/m2/')
-    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file_3(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 def m3_2x_coefficients(device=None):
     '''
@@ -861,10 +861,10 @@ def m3_2x_coefficients(device=None):
     Use compute_from_ase for this
     '''
     torchani_dir = Path(__file__).resolve().parent.as_posix()
-    ani_model = ANIPBE0()
+    ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion_2x/m3/')
-    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file_3(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 def v_2x_coefficients(device=None):
     '''
@@ -872,10 +872,10 @@ def v_2x_coefficients(device=None):
     Use compute_from_ase for this
     '''
     torchani_dir = Path(__file__).resolve().parent.as_posix()
-    ani_model = ANIPBE0()
+    ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     path = os.path.join(torchani_dir, 'resources/dispersion_2x/v/')
-    return CoefficientExtractor._from_file(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
+    return CoefficientExtractor._from_file_3(path, ani_model.aev_computer, ani_model.species_to_tensor, torch.float32, device)
 
 
 def m1_coefficients_CC(device=None):

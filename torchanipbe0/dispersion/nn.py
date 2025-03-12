@@ -620,6 +620,17 @@ class CoefficientExtractor(nn.Module):
         new_extractor.device = device
         new_extractor.species_to_tensor = species_to_tensor
         return new_extractor
+    
+    @classmethod
+    def _from_file_3(cls, path, aev_computer, species_to_tensor, dtype=None, device=None): ### HERE
+        new_layer = CoefficientLayer._from_file_3(path, dtype=dtype, device=device)
+        new_extractor = cls(None, None, None, None, None, None, None, None)
+        new_extractor.model = new_layer.to(device)
+        new_extractor.aev_computer = aev_computer
+        new_extractor.dtype = dtype
+        new_extractor.device = device
+        new_extractor.species_to_tensor = species_to_tensor
+        return new_extractor
 
     def forward(self, species_coordinates, cell=None, pbc=None):
         species_aev = self.aev_computer(species_coordinates, cell, pbc)
