@@ -15,24 +15,28 @@ submitted as its own Slurm job.
   argument.
 * `submit_macepbe0.sh`, `submit_macexdm.sh` — per-job Slurm templates. Each
   takes one xyz file as its argument and times just that structure.
-* `submit_all_macepbe0.sh`, `submit_all_macexdm.sh` — driver scripts (plain
-  bash, run directly on the login node, not sbatch scripts themselves).
-  They scan the xyz directory, and for every multiple of 10 water molecules
-  (configurable via `--step`) that has a matching file, call
-  `sbatch submit_mace*.sh <file>` — one Slurm job per size.
+* `submit_all.py` — Python driver that scans the xyz directory and, for
+  every multiple of 10 water molecules (configurable via `--step`) that has
+  a matching file, runs `sbatch` on the matching per-job template — one
+  Slurm job per size. Run directly on the login node (it calls `sbatch` via
+  `subprocess`, it does not submit itself as a job).
 
 ## Usage
 
 ```bash
-./submit_all_macepbe0.sh
-./submit_all_macexdm.sh
+python submit_all.py macepbe0
+python submit_all.py macexdm
+python submit_all.py both          # submit both models' jobs in one go
 
 # every 20 waters instead of every 10, capped at 200 waters:
-./submit_all_macepbe0.sh --step 20 --max 200
+python submit_all.py macepbe0 --step 20 --max 200
 
 # a different xyz directory, or extra flags forwarded to benchmark_mace.py:
-./submit_all_macexdm.sh --xyz-dir /path/to/xyz
-./submit_all_macexdm.sh -- --xdm-checkpoint /path/to/xdm.model
+python submit_all.py macexdm --xyz-dir /path/to/xyz
+python submit_all.py macexdm -- --xdm-checkpoint /path/to/xdm.model
+
+# see what would be submitted without actually calling sbatch:
+python submit_all.py both --dry-run
 
 # submit (or rerun) a single size directly:
 sbatch submit_macepbe0.sh /path/to/xyz/water_ball_0100.xyz
@@ -49,9 +53,9 @@ The checkpoint paths, xyz directory, module/venv activation, and Slurm
 account are all specific to the original cluster:
 
 * `benchmark_mace.py` defaults `--pbe0-checkpoint`, `--xdm-checkpoint`, and
-  `--xyz-dir` to the original cluster's paths — override them (the
-  `submit_all_*.sh` drivers forward anything after `--` straight through to
-  `benchmark_mace.py`, and `--xyz-dir` has its own driver flag).
+  `--xyz-dir` to the original cluster's paths — override them (`submit_all.py`
+  forwards anything after `--` straight through to `benchmark_mace.py`, and
+  `--xyz-dir` has its own flag).
 * Edit the `#SBATCH --account=...`, `module purge` / `source .../activate`,
   and `--gres=gpu:1` lines in `submit_macepbe0.sh` / `submit_macexdm.sh` to
   match the new cluster.
