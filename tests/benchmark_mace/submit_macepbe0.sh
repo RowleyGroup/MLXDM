@@ -9,10 +9,11 @@
 #SBATCH --account=def-crowley-ab
 #SBATCH --output=slurm_%j_macepbe0_benchmark.out
 
-# Usage: sbatch submit_macepbe0.sh [max_n_pentane]
-MAX_N_PENTANE="${1:-100}"
+# Usage: sbatch submit_macepbe0.sh [extra benchmark_mace.py flags]
+# e.g.:  sbatch submit_macepbe0.sh --limit 20
+# e.g.:  sbatch submit_macepbe0.sh --xyz-dir /path/to/xyz
 
 module purge
 source /lustre06/project/6060902/crowley/macexdm/bin/activate
 
-python benchmark_mace.py macepbe0 "${MAX_N_PENTANE}"
+python benchmark_mace.py macepbe0 "$@"
