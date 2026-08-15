@@ -12,6 +12,7 @@ gets killed or times out partway through.
 Usage:
     python benchmark_mace.py macepbe0
     python benchmark_mace.py macexdm --xyz-dir /path/to/xyz --limit 20
+    python benchmark_mace.py macexdm --xyz-file /path/to/xyz/water_ball_0100.xyz
     python benchmark_mace.py macexdm --pbe0-checkpoint /path/to/pbe0.model \
         --xdm-checkpoint /path/to/xdm.model --device cuda
 """
@@ -122,6 +123,9 @@ def main():
                          help="Glob pattern for xyz files within --xyz-dir (default: %(default)s)")
     parser.add_argument("--limit", type=int, default=None,
                          help="Only benchmark the N smallest structures (default: all)")
+    parser.add_argument("--xyz-file", default=None,
+                         help="Benchmark only this single xyz file, instead of scanning --xyz-dir "
+                              "(used to run one water-ball size per Slurm job)")
     parser.add_argument("--pbe0-checkpoint", default=DEFAULT_PBE0_CKPT,
                          help="Path to the MACEPBE0 checkpoint (used by both models)")
     parser.add_argument("--xdm-checkpoint", default=DEFAULT_XDM_CKPT,
@@ -133,13 +137,21 @@ def main():
     args = parser.parse_args()
 
     calc = build_calculator(args.model, args.pbe0_checkpoint, args.xdm_checkpoint, args.device)
-    csv_filename = args.csv or f"simulation_timings_{args.model}.csv"
 
-    xyz_files = find_xyz_files(args.xyz_dir, args.pattern)
-    if args.limit is not None:
-        xyz_files = xyz_files[:args.limit]
+    if args.xyz_file:
+        if not os.path.isfile(args.xyz_file):
+            print(f"Error: '{args.xyz_file}' not found.")
+            sys.exit(1)
+        xyz_files = [args.xyz_file]
+        stem = os.path.splitext(os.path.basename(args.xyz_file))[0]
+        default_csv = f"simulation_timings_{args.model}_{stem}.csv"
+    else:
+        xyz_files = find_xyz_files(args.xyz_dir, args.pattern)
+        if args.limit is not None:
+            xyz_files = xyz_files[:args.limit]
+        default_csv = f"simulation_timings_{args.model}.csv"
 
-    run_benchmark(calc, xyz_files, csv_filename)
+    run_benchmark(calc, xyz_files, args.csv or default_csv)
 
 
 if __name__ == "__main__":
