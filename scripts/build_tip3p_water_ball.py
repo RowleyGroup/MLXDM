@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Build a large spherical droplet ("water ball") of rigid OPC water molecules
-for use with NAMD (via psfgen) or OpenMM.
+Build a large spherical droplet ("water ball") of rigid TIP3P water
+molecules for use with NAMD (via psfgen) or OpenMM.
 
 Why this exists
 ----------------
@@ -22,23 +22,26 @@ final files stay readable by NAMD.
 
 What this script produces (in --outdir)
 ----------------------------------------
-  <prefix>.rtf                 the OPC topology fragment (CHARMM RTF format)
+  <prefix>.rtf                 the TIP3P topology fragment (CHARMM RTF format)
   <prefix>_chunk_000.pdb, ...  water coordinates, <= max-per-segment residues each
   <prefix>_build_psf.tcl       psfgen script that turns the chunks into a PSF+PDB
   <prefix>_manifest.json       summary (counts, segments, chunk files)
 
-Geometry
---------
-OPC is a rigid, 4-site water model (Izadi, Anandakrishnan & Onufriev, J. Phys.
-Chem. Lett. 2014, 5, 3863). Fixed internal geometry:
-    r(O-H)   = 0.87243 A
-    <(H-O-H) = 103.6 deg
-    r(O-M)   = 0.1594 A   (M on the H-O-H bisector, on the hydrogen side)
-These are geometry-only constants (bond lengths/angles used just to place the
-atoms); they carry no force-field parameters. This script does not supply
-partial charges, Lennard-Jones parameters, or virtual-site reconstruction
-rules -- see the printed notes at the end of a run, and scripts/README_water_ball.md,
-for how those get attached before you can actually run MD.
+Geometry and topology
+----------------------
+This is the standard CHARMM-modified TIP3P water (residue TIP3, atoms OH2,
+H1, H2 -- the same model used throughout CHARMM36/NAMD and by
+openmm/app/data/charmm36/water.xml), based on Jorgensen et al., J. Chem.
+Phys. 1983, 79, 926:
+    r(O-H)   = 0.9572 A
+    <(H-O-H) = 104.52 deg
+The H1-H2 "bond" in the RTF below carries a force constant of 0 -- it exists
+only so CHARMM-style SHAKE/rigid-water setups have an explicit H-H distance
+to constrain, exactly as in the standard CHARMM toppar_water_ions.str file.
+Charges (OH2 -0.834, H +0.417 each) are the standard TIP3P values. This
+topology fragment defines atoms, bonds, and charges only -- the Lennard-Jones
+parameters (par_water_ions.str, freely available as part of the standard
+CHARMM36 toppar distribution) are still needed for NAMD to actually run MD.
 
 Requirements: Python 3.8+, numpy. No network access needed.
 """
@@ -46,53 +49,49 @@ Requirements: Python 3.8+, numpy. No network access needed.
 import argparse
 import json
 import math
-import sys
 from pathlib import Path
 
 import numpy as np
 
 # ---------------------------------------------------------------------------
-# OPC rigid-body geometry (Izadi et al. 2014)
+# TIP3P rigid-body geometry (Jorgensen et al. 1983; CHARMM-modified TIP3P)
 # ---------------------------------------------------------------------------
-R_OH = 0.87243       # Angstrom
-ANGLE_HOH_DEG = 103.6
-R_OM = 0.1594        # Angstrom, O -> M along the H-O-H bisector
+R_OH = 0.9572        # Angstrom
+ANGLE_HOH_DEG = 104.52
 
 WATER_MOLAR_MASS = 18.01528  # g/mol
 AVOGADRO = 6.02214076e23     # 1/mol
 
-# Given topology fragment for psfgen (CHARMM RTF format).
-# Reproduced verbatim from the user-supplied fragment. NOTE: this fragment
-# defines atoms/bonds only (no ATOM line for M, no force-field parameters).
-OPC_RTF = """\
-* OPC water model topology fragment for psfgen (CHARMM/RTF format fragment)
-* Minimal topology to build PSF: residue name OPC with atoms O H1 H2 M (M is the extra site)
-* Note: This defines atoms and bonds only; force field parameters (prm) are not included here.
+# Standard CHARMM RTF fragment for TIP3P (matches toppar_water_ions.str).
+TIP3P_RTF = """\
+* TIP3P water model topology fragment for psfgen (CHARMM/RTF format fragment)
+* Standard CHARMM-modified TIP3P: residue name TIP3 with atoms OH2 H1 H2
+* Note: atoms, bonds and charges only; Lennard-Jones parameters (par_water_ions.str)
+* are not included here.
 *
 
-MASS        1    OW    15.9994
-MASS        2    HW     1.00794
-MASS        3    EP     0.0000
+MASS   -1  OT    15.99940  O
+MASS   -1  HT     1.00800  H
 
-RESI OPC  0.0
+RESI TIP3          0.000
 GROUP
-ATOM  O    OW   -0.89517
-ATOM  H1   HW   0.447585
-ATOM  H2   HW   0.447585
-BOND O H1
-BOND O H2
+ATOM OH2  OT     -0.834
+ATOM H1   HT      0.417
+ATOM H2   HT      0.417
+BOND OH2 H1 OH2 H2 H1 H2
+ANGLE H1 OH2 H2
+PATCHING FIRS NONE LAST NONE
 END
 """
 
 
-def opc_template() -> np.ndarray:
-    """Return the 4 atom positions (O, H1, H2, M) of one OPC water with O at
+def tip3p_template() -> np.ndarray:
+    """Return the 3 atom positions (OH2, H1, H2) of one TIP3P water with O at
     the origin and the H-O-H bisector along +x."""
     half_angle = math.radians(ANGLE_HOH_DEG) / 2.0
     h1 = (R_OH * math.cos(half_angle), R_OH * math.sin(half_angle), 0.0)
     h2 = (R_OH * math.cos(half_angle), -R_OH * math.sin(half_angle), 0.0)
-    m = (R_OM, 0.0, 0.0)
-    return np.array([(0.0, 0.0, 0.0), h1, h2, m])
+    return np.array([(0.0, 0.0, 0.0), h1, h2])
 
 
 def random_rotation_matrices(n: int, rng: np.random.Generator) -> np.ndarray:
@@ -143,7 +142,7 @@ def build_lattice_centers(radius: float, spacing: float, jitter: float,
 
 def build_water_ball(diameter: float, density: float, jitter: float,
                       seed: int) -> np.ndarray:
-    """Return array of shape (n_waters, 4, 3): O, H1, H2, M per water."""
+    """Return array of shape (n_waters, 3, 3): OH2, H1, H2 per water."""
     radius = diameter / 2.0
     spacing = number_density(density) ** (-1.0 / 3.0)
     rng = np.random.default_rng(seed)
@@ -153,7 +152,7 @@ def build_water_ball(diameter: float, density: float, jitter: float,
     if n == 0:
         raise ValueError("No waters generated -- diameter is too small for the lattice spacing.")
 
-    template = opc_template()
+    template = tip3p_template()
     rot = random_rotation_matrices(n, rng)
     # positions[i, a, :] = rot[i] @ template[a] + centers[i]
     positions = np.einsum("nij,aj->nai", rot, template) + centers[:, None, :]
@@ -163,15 +162,20 @@ def build_water_ball(diameter: float, density: float, jitter: float,
 # ---------------------------------------------------------------------------
 # PDB writing
 # ---------------------------------------------------------------------------
-ATOM_NAMES = ["O", "H1", "H2", "M"]
-ELEMENTS = ["O", "H", "H", ""]
+ATOM_NAMES = ["OH2", "H1", "H2"]
+ELEMENTS = ["O", "H", "H"]
 
 
 def format_atom_line(serial: int, name: str, resname: str, chain: str,
                       resid: int, xyz, element: str, segid: str) -> str:
+    # Column layout matches VMD's molfile pdbplugin write_raw_pdb_record
+    # exactly ("%-6s%5s %4s%c%-4s%c%4s%c   %8.3f..."): a 4-character,
+    # left-justified resName field -- 3 columns (the strict PDB spec width)
+    # is too narrow for CHARMM residue names like "TIP3" and silently
+    # shifts every field after it.
     x, y, z = xyz
     return (
-        f"ATOM  {serial:5d} {name:<4s}{'':1s}{resname:<3s} {chain:1s}{resid:4d}{'':1s}   "
+        f"ATOM  {serial:5d} {name:>4s}{'':1s}{resname:<4s}{chain:1s}{resid:4d}{'':1s}   "
         f"{x:8.3f}{y:8.3f}{z:8.3f}{1.00:6.2f}{0.00:6.2f}      {segid:<4s}{element:>2s}\n"
     )
 
@@ -181,7 +185,7 @@ def write_chunk_pdb(path: Path, positions: np.ndarray, segid: str, chain: str) -
         serial = 1
         for resid, water in enumerate(positions, start=1):
             for name, element, xyz in zip(ATOM_NAMES, ELEMENTS, water):
-                fh.write(format_atom_line(serial, name, "OPC", chain, resid, xyz, element, segid))
+                fh.write(format_atom_line(serial, name, "TIP3", chain, resid, xyz, element, segid))
                 serial += 1
         fh.write("END\n")
 
@@ -200,22 +204,16 @@ def segment_id(index: int) -> str:
 # psfgen Tcl script
 # ---------------------------------------------------------------------------
 TCL_HEADER = """\
-# Auto-generated by build_opc_water_ball.py
+# Auto-generated by build_tip3p_water_ball.py
 # Run with either:
 #   vmd -dispdev text -e {tcl_name}
 #   psfgen {tcl_name}          (standalone psfgen binary)
 #
-# Verify before trusting the output for production MD:
-#  1. Your psfgen/VMD version must support hybrid-36 extended numbering for
-#     systems with >9999 residues or >99999 atoms in the *combined* output
-#     (VMD >= 1.9.3 does this automatically). Older builds will silently
-#     truncate/wrap numbers.
-#  2. This topology does not define how the M virtual site should be
-#     reconstructed each MD step (no LONEPAIR record). psfgen's support for
-#     parsing/writing CHARMM LONEPAIR records is version-dependent -- test
-#     it, or use the OpenMM route (scripts/load_water_ball_openmm.py) which
-#     builds the M virtual site directly in Python and does not depend on
-#     psfgen for it.
+# Verify before trusting the output for production MD: your psfgen/VMD
+# version must support hybrid-36 extended numbering for systems with
+# >9999 residues or >99999 atoms in the *combined* output (VMD >= 1.9.3
+# does this automatically). Older builds will silently truncate/wrap
+# numbers instead.
 
 package require psfgen
 resetpsf
@@ -253,7 +251,7 @@ def write_tcl_script(path: Path, rtf_name: str, chunk_files, psf_name: str, comb
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Build a large spherical OPC water droplet for NAMD/OpenMM.",
+        description="Build a large spherical TIP3P water droplet for NAMD/OpenMM.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("diameter", type=float, help="Droplet diameter in Angstroms.")
@@ -278,16 +276,16 @@ def main():
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Building OPC water ball: diameter={args.diameter:.1f} A, "
+    print(f"Building TIP3P water ball: diameter={args.diameter:.1f} A, "
           f"density={args.density:.3f} g/cm^3, seed={args.seed}")
     positions = build_water_ball(args.diameter, args.density, args.jitter, args.seed)
     n_waters = positions.shape[0]
-    n_atoms = n_waters * 4
+    n_atoms = n_waters * 3
     print(f"Generated {n_waters:,} waters ({n_atoms:,} atoms).")
 
     # --- RTF ---
     rtf_path = outdir / f"{args.prefix}.rtf"
-    rtf_path.write_text(OPC_RTF)
+    rtf_path.write_text(TIP3P_RTF)
     print(f"Wrote topology fragment: {rtf_path}")
 
     # --- chunked PDBs, one psfgen segment each ---
@@ -301,7 +299,7 @@ def main():
         chunk_files.append((segid, chunk_name))
     print(f"Wrote {len(chunk_files)} chunk PDB file(s), <= {max_per} waters each "
           f"(largest segment: {min(max_per, n_waters):,} residues, "
-          f"{min(max_per, n_waters) * 4:,} atoms -- both within standard PDB limits).")
+          f"{min(max_per, n_waters) * 3:,} atoms -- both within standard PDB limits).")
 
     # --- psfgen Tcl script ---
     tcl_path = outdir / f"{args.prefix}_build_psf.tcl"
@@ -311,8 +309,9 @@ def main():
     print(f"Wrote psfgen script: {tcl_path}")
 
     # --- manifest ---
-    total_charge = n_waters * (-0.89517 + 2 * 0.447585)
+    total_charge = n_waters * (-0.834 + 2 * 0.417)
     manifest = {
+        "water_model": "TIP3P (CHARMM-modified)",
         "diameter_angstrom": args.diameter,
         "density_g_cm3": args.density,
         "n_waters": n_waters,
@@ -326,7 +325,7 @@ def main():
         "psfgen_tcl": tcl_path.name,
         "expected_psf": psf_name,
         "expected_pdb": combined_pdb_name,
-        "total_charge_on_OH_atoms_only": total_charge,
+        "total_charge": total_charge,
     }
     manifest_path = outdir / f"{args.prefix}_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
@@ -335,10 +334,11 @@ def main():
     print("\nNext steps:")
     print(f"  1. vmd -dispdev text -e {tcl_path.name}   (or: psfgen {tcl_path.name})")
     print(f"     -> produces {psf_name} / {combined_pdb_name}")
-    print("  2. Attach real force-field parameters (charges/LJ/virtual-site rule) before "
-          "running MD -- see scripts/README_water_ball.md.")
+    print("  2. For NAMD, still need the standard CHARMM par_water_ions.str Lennard-Jones "
+          "parameters (freely available in any CHARMM36 toppar distribution) -- this script "
+          "only supplies atoms/bonds/charges.")
     print("  3. For OpenMM, scripts/load_water_ball_openmm.py can build a System directly "
-          "from the chunk PDBs, using the published OPC parameters, without going through psfgen.")
+          "from the chunk PDBs, using the standard TIP3P parameters, without going through psfgen.")
 
 
 if __name__ == "__main__":

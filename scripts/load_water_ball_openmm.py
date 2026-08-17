@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 """
-Load a water ball produced by build_opc_water_ball.py directly into OpenMM,
-building the M virtual site and OPC force-field parameters in Python -- no
-psfgen/CHARMM LONEPAIR support required.
+Load a water ball produced by build_tip3p_water_ball.py directly into
+OpenMM, building the System (rigid constraints + force-field parameters) in
+Python -- no psfgen/CHARMM parameter file required.
 
-The published OPC parameters used below (charges, Lennard-Jones, and the
-"average of 3 particles" virtual-site weights for the M site) are taken from
-OpenMM's own bundled amber14/opc.xml, which implements Izadi, Anandakrishnan
-& Onufriev, J. Phys. Chem. Lett. 2014, 5, 3863-3871:
-    q(O) = 0.0,          q(H) = +0.679142,      q(M) = -1.358284
-    sigma(O) = 0.3167 nm, epsilon(O) = 0.8904 kJ/mol   (H, M: epsilon = 0)
-    r(O-H) = 0.087243313 nm, angle(H-O-H) = 1.808 rad (103.6 deg)
-    M = 0.7046*O + 0.1477*H1 + 0.1477*H2   (ThreeParticleAverageSite)
+The TIP3P parameters used below (charges and Lennard-Jones) are the standard
+CHARMM-modified TIP3P values, taken from OpenMM's own bundled
+charmm36/water.xml (Jorgensen et al., J. Chem. Phys. 1983, 79, 926):
+    q(OH2) = -0.834,  q(H1) = q(H2) = +0.417
+    sigma(O) = 0.31506 nm, epsilon(O) = 0.6364 kJ/mol
+    sigma(H) = 0.04000 nm, epsilon(H) = 0.1925 kJ/mol
+    r(O-H) = 0.09572 nm, angle(H-O-H) = 104.52 deg -> r(H-H) = 0.15139 nm
 
 Usage:
     python3 load_water_ball_openmm.py waterball_manifest.json --minimize out_min.pdb
 
 This reads every chunk PDB listed in the manifest (as written by
-build_opc_water_ball.py), builds an OpenMM Topology + System with rigid-water
-constraints and the M virtual site, and (optionally) runs a short local
-energy minimization as a smoke test before writing the result out.
+build_tip3p_water_ball.py), builds an OpenMM Topology + System with rigid
+water constraints, and (optionally) runs a short local energy minimization
+as a smoke test before writing the result out.
 """
 
 import argparse
@@ -31,29 +30,25 @@ import openmm as mm
 import openmm.app as app
 import openmm.unit as unit
 
-# --- published OPC parameters (see module docstring) ---
-Q_O, Q_H, Q_M = 0.0, 0.679142, -1.358284
-SIGMA_O, EPSILON_O = 0.3167, 0.8904          # nm, kJ/mol
-SIGMA_HM, EPSILON_HM = 0.0891, 0.0           # nm, kJ/mol (H and M placeholders, eps=0)
-R_OH_NM = 0.087243313
-ANGLE_HOH_RAD = 1.808
-VSITE_WEIGHTS = (0.7046, 0.1477, 0.1477)     # O, H1, H2
+# --- standard CHARMM-modified TIP3P parameters (see module docstring) ---
+Q_O, Q_H = -0.834, 0.417
+SIGMA_O, EPSILON_O = 0.31506, 0.6364   # nm, kJ/mol
+SIGMA_H, EPSILON_H = 0.04000, 0.1925   # nm, kJ/mol
+R_OH_NM = 0.09572
+ANGLE_HOH_RAD = math.radians(104.52)
 
-MASS_O = 15.99943
-MASS_H = 1.008
+MASS_O = 15.99940
+MASS_H = 1.00800
 
 
 def read_chunk_pdb(path: Path):
-    """Parse a chunk PDB written by build_opc_water_ball.py. Returns
-    positions (nm) for O, H1, H2 in file order (M is dropped -- OpenMM will
-    rebuild it as a virtual site)."""
+    """Parse a chunk PDB written by build_tip3p_water_ball.py. Returns a
+    flat list of (x, y, z) positions in nm, in file order (OH2, H1, H2 per
+    residue)."""
     coords = []
     with open(path) as fh:
         for line in fh:
             if not line.startswith("ATOM"):
-                continue
-            name = line[12:16].strip()
-            if name == "M":
                 continue
             x = float(line[30:38]) / 10.0
             y = float(line[38:46]) / 10.0
@@ -67,18 +62,16 @@ def build_topology_and_positions(chunk_paths):
     positions = []
     for path in chunk_paths:
         coords = read_chunk_pdb(path)
-        assert len(coords) % 3 == 0, f"{path}: expected O/H1/H2 triplets"
+        assert len(coords) % 3 == 0, f"{path}: expected OH2/H1/H2 triplets"
         chain = topology.addChain()
         for i in range(0, len(coords), 3):
-            residue = topology.addResidue("OPC", chain)
-            o = topology.addAtom("O", app.element.oxygen, residue)
+            residue = topology.addResidue("TIP3", chain)
+            o = topology.addAtom("OH2", app.element.oxygen, residue)
             h1 = topology.addAtom("H1", app.element.hydrogen, residue)
             h2 = topology.addAtom("H2", app.element.hydrogen, residue)
-            m = topology.addAtom("M", None, residue)
             topology.addBond(o, h1)
             topology.addBond(o, h2)
             positions.extend(coords[i:i + 3])
-            positions.append(coords[i])  # placeholder for M, replaced below
     return topology, positions
 
 
@@ -97,56 +90,31 @@ def build_system(topology: app.Topology) -> mm.System:
     d_hh = 2 * R_OH_NM * math.sin(ANGLE_HOH_RAD / 2.0)
 
     for residue in topology.residues():
-        atoms = list(residue.atoms())
-        o, h1, h2, m = atoms  # addAtom order above: O, H1, H2, M
+        o, h1, h2 = residue.atoms()
         o_idx = system.addParticle(MASS_O)
         h1_idx = system.addParticle(MASS_H)
         h2_idx = system.addParticle(MASS_H)
-        m_idx = system.addParticle(0.0)
 
         nonbonded.addParticle(Q_O, SIGMA_O, EPSILON_O)
-        nonbonded.addParticle(Q_H, SIGMA_HM, EPSILON_HM)
-        nonbonded.addParticle(Q_H, SIGMA_HM, EPSILON_HM)
-        nonbonded.addParticle(Q_M, SIGMA_HM, EPSILON_HM)
+        nonbonded.addParticle(Q_H, SIGMA_H, EPSILON_H)
+        nonbonded.addParticle(Q_H, SIGMA_H, EPSILON_H)
 
         system.addConstraint(o_idx, h1_idx, R_OH_NM)
         system.addConstraint(o_idx, h2_idx, R_OH_NM)
         system.addConstraint(h1_idx, h2_idx, d_hh)
 
-        system.setVirtualSite(
-            m_idx, mm.ThreeParticleAverageSite(o_idx, h1_idx, h2_idx, *VSITE_WEIGHTS)
-        )
-
-        # Exclude all intramolecular nonbonded interactions (rigid + virtual site).
-        for a in (o_idx, h1_idx, h2_idx, m_idx):
-            for b in (o_idx, h1_idx, h2_idx, m_idx):
-                if a < b:
-                    nonbonded.addException(a, b, 0.0, 1.0, 0.0)
+        # Exclude all intramolecular nonbonded interactions (fully rigid molecule).
+        nonbonded.addException(o_idx, h1_idx, 0.0, 1.0, 0.0)
+        nonbonded.addException(o_idx, h2_idx, 0.0, 1.0, 0.0)
+        nonbonded.addException(h1_idx, h2_idx, 0.0, 1.0, 0.0)
 
     return system
-
-
-def place_virtual_sites(system: mm.System, positions_nm):
-    """Recompute the M-site positions from the (already correct) O/H1/H2
-    positions using the same weights as the virtual site definition, so the
-    initial coordinates are self-consistent."""
-    positions = [mm.Vec3(*p) for p in positions_nm]
-    for i in range(0, len(positions), 4):
-        o, h1, h2 = positions[i], positions[i + 1], positions[i + 2]
-        wo, w1, w2 = VSITE_WEIGHTS
-        m = mm.Vec3(
-            wo * o.x + w1 * h1.x + w2 * h2.x,
-            wo * o.y + w1 * h1.y + w2 * h2.y,
-            wo * o.z + w1 * h1.z + w2 * h2.z,
-        )
-        positions[i + 3] = m
-    return positions
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("manifest", help="waterball_manifest.json from build_opc_water_ball.py")
+    parser.add_argument("manifest", help="waterball_manifest.json from build_tip3p_water_ball.py")
     parser.add_argument("--minimize", metavar="OUT.pdb", default=None,
                          help="Run a short local energy minimization and write the result here.")
     args = parser.parse_args()
@@ -156,13 +124,11 @@ def main():
     chunk_paths = [manifest_path.parent / name for name in manifest["chunk_files"]]
 
     print(f"Loading {manifest['n_waters']:,} waters from {len(chunk_paths)} chunk file(s)...")
-    topology, positions_nm = build_topology_and_positions(chunk_paths)
+    topology, positions = build_topology_and_positions(chunk_paths)
     system = build_system(topology)
-    positions = place_virtual_sites(system, positions_nm)
 
     print(f"Built System: {system.getNumParticles():,} particles, "
-          f"{system.getNumConstraints():,} constraints, "
-          f"{sum(1 for i in range(system.getNumParticles()) if system.isVirtualSite(i)):,} virtual sites.")
+          f"{system.getNumConstraints():,} constraints.")
 
     if args.minimize:
         integrator = mm.LangevinMiddleIntegrator(300 * unit.kelvin, 1 / unit.picosecond,
