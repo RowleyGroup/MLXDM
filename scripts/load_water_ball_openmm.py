@@ -1,24 +1,16 @@
 #!/usr/bin/env python3
 """
-Load a water ball produced by build_tip3p_water_ball.py directly into
-OpenMM, building the System (rigid constraints + force-field parameters) in
-Python -- no psfgen/CHARMM parameter file required.
+Load a water ball produced by build_water_ball.py directly into OpenMM,
+building the System (rigid constraints + force-field parameters) in Python
+-- no psfgen/CHARMM parameter file required.
 
-The TIP3P parameters used below (charges and Lennard-Jones) are the standard
-CHARMM-modified TIP3P values, taken from OpenMM's own bundled
-charmm36/water.xml (Jorgensen et al., J. Chem. Phys. 1983, 79, 926):
-    q(OH2) = -0.834,  q(H1) = q(H2) = +0.417
-    sigma(O) = 0.31506 nm, epsilon(O) = 0.6364 kJ/mol
-    sigma(H) = 0.04000 nm, epsilon(H) = 0.1925 kJ/mol
-    r(O-H) = 0.09572 nm, angle(H-O-H) = 104.52 deg -> r(H-H) = 0.15139 nm
+Reads the water model (tip3p / opc3 / tip3pfb) from the manifest and pulls
+its parameters from water_models.py -- the same source of truth used to
+generate the .rtf/.prm files -- so this is guaranteed consistent with
+whatever model build_water_ball.py was run with.
 
 Usage:
     python3 load_water_ball_openmm.py waterball_manifest.json --minimize out_min.pdb
-
-This reads every chunk PDB listed in the manifest (as written by
-build_tip3p_water_ball.py), builds an OpenMM Topology + System with rigid
-water constraints, and (optionally) runs a short local energy minimization
-as a smoke test before writing the result out.
 """
 
 import argparse
@@ -30,21 +22,12 @@ import openmm as mm
 import openmm.app as app
 import openmm.unit as unit
 
-# --- standard CHARMM-modified TIP3P parameters (see module docstring) ---
-Q_O, Q_H = -0.834, 0.417
-SIGMA_O, EPSILON_O = 0.31506, 0.6364   # nm, kJ/mol
-SIGMA_H, EPSILON_H = 0.04000, 0.1925   # nm, kJ/mol
-R_OH_NM = 0.09572
-ANGLE_HOH_RAD = math.radians(104.52)
-
-MASS_O = 15.99940
-MASS_H = 1.00800
+from water_models import get_model
 
 
 def read_chunk_pdb(path: Path):
-    """Parse a chunk PDB written by build_tip3p_water_ball.py. Returns a
-    flat list of (x, y, z) positions in nm, in file order (OH2, H1, H2 per
-    residue)."""
+    """Parse a chunk PDB written by build_water_ball.py. Returns a flat list
+    of (x, y, z) positions in nm, in file order (O, H1, H2 per residue)."""
     coords = []
     with open(path) as fh:
         for line in fh:
@@ -57,16 +40,16 @@ def read_chunk_pdb(path: Path):
     return coords
 
 
-def build_topology_and_positions(chunk_paths):
+def build_topology_and_positions(chunk_paths, model):
     topology = app.Topology()
     positions = []
     for path in chunk_paths:
         coords = read_chunk_pdb(path)
-        assert len(coords) % 3 == 0, f"{path}: expected OH2/H1/H2 triplets"
+        assert len(coords) % 3 == 0, f"{path}: expected O/H1/H2 triplets"
         chain = topology.addChain()
         for i in range(0, len(coords), 3):
-            residue = topology.addResidue("TIP3", chain)
-            o = topology.addAtom("OH2", app.element.oxygen, residue)
+            residue = topology.addResidue(model.resname, chain)
+            o = topology.addAtom(model.atom_o, app.element.oxygen, residue)
             h1 = topology.addAtom("H1", app.element.hydrogen, residue)
             h2 = topology.addAtom("H2", app.element.hydrogen, residue)
             topology.addBond(o, h1)
@@ -75,7 +58,7 @@ def build_topology_and_positions(chunk_paths):
     return topology, positions
 
 
-def build_system(topology: app.Topology) -> mm.System:
+def build_system(topology: app.Topology, model) -> mm.System:
     system = mm.System()
     # A water "ball"/droplet is a finite, non-periodic system (unlike a
     # periodic solvent box), so use a non-periodic cutoff rather than PME.
@@ -87,21 +70,22 @@ def build_system(topology: app.Topology) -> mm.System:
     nonbonded.setCutoffDistance(1.2 * unit.nanometer)
     system.addForce(nonbonded)
 
-    d_hh = 2 * R_OH_NM * math.sin(ANGLE_HOH_RAD / 2.0)
+    r_oh_nm = model.r_oh / 10.0
+    d_hh_nm = model.d_hh / 10.0
 
     for residue in topology.residues():
         o, h1, h2 = residue.atoms()
-        o_idx = system.addParticle(MASS_O)
-        h1_idx = system.addParticle(MASS_H)
-        h2_idx = system.addParticle(MASS_H)
+        o_idx = system.addParticle(model.mass_o)
+        h1_idx = system.addParticle(model.mass_h)
+        h2_idx = system.addParticle(model.mass_h)
 
-        nonbonded.addParticle(Q_O, SIGMA_O, EPSILON_O)
-        nonbonded.addParticle(Q_H, SIGMA_H, EPSILON_H)
-        nonbonded.addParticle(Q_H, SIGMA_H, EPSILON_H)
+        nonbonded.addParticle(model.q_o, model.sigma_o_nm, model.epsilon_o_kjmol)
+        nonbonded.addParticle(model.q_h, model.sigma_h_nm, model.epsilon_h_kjmol)
+        nonbonded.addParticle(model.q_h, model.sigma_h_nm, model.epsilon_h_kjmol)
 
-        system.addConstraint(o_idx, h1_idx, R_OH_NM)
-        system.addConstraint(o_idx, h2_idx, R_OH_NM)
-        system.addConstraint(h1_idx, h2_idx, d_hh)
+        system.addConstraint(o_idx, h1_idx, r_oh_nm)
+        system.addConstraint(o_idx, h2_idx, r_oh_nm)
+        system.addConstraint(h1_idx, h2_idx, d_hh_nm)
 
         # Exclude all intramolecular nonbonded interactions (fully rigid molecule).
         nonbonded.addException(o_idx, h1_idx, 0.0, 1.0, 0.0)
@@ -114,7 +98,7 @@ def build_system(topology: app.Topology) -> mm.System:
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("manifest", help="waterball_manifest.json from build_tip3p_water_ball.py")
+    parser.add_argument("manifest", help="waterball_manifest.json from build_water_ball.py")
     parser.add_argument("--minimize", metavar="OUT.pdb", default=None,
                          help="Run a short local energy minimization and write the result here.")
     args = parser.parse_args()
@@ -122,10 +106,12 @@ def main():
     manifest_path = Path(args.manifest)
     manifest = json.loads(manifest_path.read_text())
     chunk_paths = [manifest_path.parent / name for name in manifest["chunk_files"]]
+    model = get_model(manifest["water_model"])
 
-    print(f"Loading {manifest['n_waters']:,} waters from {len(chunk_paths)} chunk file(s)...")
-    topology, positions = build_topology_and_positions(chunk_paths)
-    system = build_system(topology)
+    print(f"Loading {manifest['n_waters']:,} waters ({model.display_name}) "
+          f"from {len(chunk_paths)} chunk file(s)...")
+    topology, positions = build_topology_and_positions(chunk_paths, model)
+    system = build_system(topology, model)
 
     print(f"Built System: {system.getNumParticles():,} particles, "
           f"{system.getNumConstraints():,} constraints.")
