@@ -53,6 +53,15 @@ HARTREE_TO_KJOULEMOL = HARTREE_TO_JOULE * AVOGADROS_NUMBER / 1000
 EV_TO_KCALMOL = EV_TO_JOULE * JOULE_TO_KCAL * AVOGADROS_NUMBER
 EV_TO_KJOULEMOL = EV_TO_JOULE * AVOGADROS_NUMBER / 1000
 
+# For molecular dynamics:
+
+# torchani's internal unit system is (Hartree, Angstrom, AMU). The unit of
+# time that makes F = m * a hold with no extra factors in that system is
+# sqrt(AMU * Angstrom^2 / Hartree); this constant is that unit of time,
+# expressed in femtoseconds, so that MD code can work with timesteps and
+# velocities expressed in the more familiar fs / (Angstrom/fs).
+HARTREE_ANGSTROM_AMU_TIME_TO_FS = math.sqrt(AMU_TO_KG * ANGSTROM_TO_METER ** 2 / HARTREE_TO_JOULE) / 1e-15
+
 # For vibrational analysis:
 
 INVCM_TO_EV = 0.0001239841973964072  # equal to ase.units.invcm

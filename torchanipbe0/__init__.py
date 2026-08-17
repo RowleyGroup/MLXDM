@@ -36,6 +36,7 @@ from . import utils
 from . import neurochem
 from . import models
 from . import units
+from . import md
 from importlib.metadata import version, PackageNotFoundError
 import warnings
 
@@ -45,7 +46,7 @@ except PackageNotFoundError:
     pass
 
 __all__ = ['AEVComputer', 'EnergyShifter', 'ANIModel', 'Ensemble', 'SpeciesConverter',
-           'utils', 'neurochem', 'models', 'units']
+           'utils', 'neurochem', 'models', 'units', 'md']
 
 try:
     from . import ase  # noqa: F401
