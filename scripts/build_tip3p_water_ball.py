@@ -209,11 +209,12 @@ TCL_HEADER = """\
 #   vmd -dispdev text -e {tcl_name}
 #   psfgen {tcl_name}          (standalone psfgen binary)
 #
-# Verify before trusting the output for production MD: your psfgen/VMD
-# version must support hybrid-36 extended numbering for systems with
-# >9999 residues or >99999 atoms in the *combined* output (VMD >= 1.9.3
-# does this automatically). Older builds will silently truncate/wrap
-# numbers instead.
+# Verify before trusting the output for production MD: once the combined
+# system exceeds 9999 residues or 99999 atoms, writepsf/writepdb below need
+# psfgen/VMD >= 1.9.3 to switch to hybrid-36 extended numbering automatically
+# (there is no explicit "extended" keyword to pass -- writepsf only takes
+# [charmm|x-plor] [cmap|nocmap] [nopatches]). Older builds will silently
+# truncate/wrap numbers instead.
 
 package require psfgen
 resetpsf
@@ -233,7 +234,7 @@ coordpdb {pdb_name} {segid}
 """
 
 TCL_FOOTER = """\
-writepsf x-plor extended {psf_name}
+writepsf x-plor {psf_name}
 writepdb {pdb_name}
 """
 
