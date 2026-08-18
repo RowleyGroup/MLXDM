@@ -28,6 +28,7 @@ T = 298.15
 MD_STEPS = 100000
 TIMESTEP_FS = 1.0
 FRICTION = 0.002
+WARMUP_STEPS = 10
 
 
 def build_model(model_name, device):
@@ -172,6 +173,14 @@ def run_benchmark(model, device, xyz_files, csv_filename, outdir, traj_interval,
             dyn = Langevin(model, species, coordinates, velocities, masses,
                             timestep=TIMESTEP_FS, temperature=T, friction=FRICTION,
                             generator=generator)
+
+            # Untimed warm-up steps: absorb one-time costs (CUDA context/kernel
+            # JIT, cuDNN/cuBLAS autotuning for these tensor shapes) so they
+            # don't get charged to the timed run below, especially on the
+            # first structure of a fresh process.
+            dyn.run(WARMUP_STEPS)
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
 
             time_initial = time.perf_counter()
             callback, close_logs = make_callback(
