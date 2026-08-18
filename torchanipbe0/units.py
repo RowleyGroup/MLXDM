@@ -62,6 +62,10 @@ EV_TO_KJOULEMOL = EV_TO_JOULE * AVOGADROS_NUMBER / 1000
 # velocities expressed in the more familiar fs / (Angstrom/fs).
 HARTREE_ANGSTROM_AMU_TIME_TO_FS = math.sqrt(AMU_TO_KG * ANGSTROM_TO_METER ** 2 / HARTREE_TO_JOULE) / 1e-15
 
+# Boltzmann constant, for Langevin/thermostatted MD (kT in Hartree given T in Kelvin).
+BOLTZMANN_CONSTANT_JOULE = 1.38064852e-23  # equal to ase.units._k (CODATA 2014), J/K
+BOLTZMANN_CONSTANT = BOLTZMANN_CONSTANT_JOULE / HARTREE_TO_JOULE  # Hartree/K
+
 # For vibrational analysis:
 
 INVCM_TO_EV = 0.0001239841973964072  # equal to ase.units.invcm

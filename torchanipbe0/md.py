@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pure PyTorch geometry optimization and NVE molecular dynamics.
+"""Pure PyTorch geometry optimization and NVE/NVT molecular dynamics.
 
 These routines drive any torchanipbe0 potential (anything exposing
 ``model((species, coordinates), cell=cell, pbc=pbc) -> SpeciesEnergies``,
@@ -18,6 +18,7 @@ Distances are in Angstrom, energies in Hartree and masses in AMU,
 consistent with the rest of the package. Timesteps and velocities use
 femtoseconds and Angstrom/fs (see :mod:`torchanipbe0.units`).
 """
+import math
 from typing import Callable, NamedTuple, Optional, Tuple
 
 import torch
@@ -175,3 +176,119 @@ class VelocityVerlet:
             if callback is not None:
                 callback(step, self.coordinates, self.velocities, self.energy, self.forces)
         return self.coordinates, self.velocities
+
+
+class Langevin:
+    """NVT molecular dynamics with a BAOAB Langevin thermostat, on-device.
+
+    Couples :class:`VelocityVerlet`-style deterministic (B, A) half-steps to
+    an exact Ornstein-Uhlenbeck update (O) for the friction/random-force pair,
+    in the "BAOAB" splitting order (B. Leimkuhler and C. Matthews, Appl. Math.
+    Res. Express 2013). As with :class:`VelocityVerlet`, all state stays as
+    torch tensors on ``coordinates.device`` for the whole trajectory, with no
+    ``ase.Atoms``/``ase.Calculator`` round trip.
+
+    Arguments:
+        model: a torchanipbe0 potential, e.g. ``models.ANIPBE0_2x(...)`` or
+            ``models.ANIPBE0_2x_MLXDM_2x(device)``.
+        species: ``(n_batch, n_atoms)`` long tensor.
+        coordinates: ``(n_batch, n_atoms, 3)`` tensor, Angstrom.
+        velocities: ``(n_batch, n_atoms, 3)`` tensor, Angstrom/fs.
+        masses: ``(n_batch, n_atoms)`` or ``(n_atoms,)`` tensor, AMU.
+        timestep: MD timestep, in femtoseconds.
+        temperature: bath temperature, in Kelvin.
+        friction: Langevin friction coefficient, in fs^-1.
+        cell, pbc: passed straight through to ``model``, for periodic
+            systems.
+        generator: optional ``torch.Generator`` for the random force, for
+            reproducible runs.
+    """
+
+    def __init__(self, model, species: Tensor, coordinates: Tensor, velocities: Tensor,
+                 masses: Tensor, timestep: float, temperature: float, friction: float,
+                 cell: Optional[Tensor] = None, pbc: Optional[Tensor] = None,
+                 generator: Optional[torch.Generator] = None):
+        self.model = model
+        self.species = species
+        self.cell = cell
+        self.pbc = pbc
+        self.timestep = timestep
+        self.temperature = temperature
+        self.friction = friction
+        self.generator = generator
+
+        device = coordinates.device
+        dtype = coordinates.dtype
+        self.coordinates = coordinates.clone().detach().to(device=device, dtype=dtype)
+        self.velocities = velocities.clone().detach().to(device=device, dtype=dtype)
+
+        masses = torch.as_tensor(masses, device=device, dtype=dtype)
+        if masses.dim() == self.coordinates.dim() - 2:
+            masses = masses.unsqueeze(0)
+        self.masses = masses.unsqueeze(-1)  # broadcasts over x, y, z
+
+        # Converts force/mass (Hartree / (Angstrom * AMU)) into
+        # Angstrom/fs^2: see units.HARTREE_ANGSTROM_AMU_TIME_TO_FS.
+        self._accel_factor = 1.0 / units.HARTREE_ANGSTROM_AMU_TIME_TO_FS ** 2
+
+        # Stationary standard deviation of the velocity of each atom under
+        # the bath, sqrt(kT / m), converted from Angstrom/(natural time
+        # unit) into Angstrom/fs.
+        kT = units.BOLTZMANN_CONSTANT * self.temperature
+        self._sigma = torch.sqrt(kT / self.masses) / units.HARTREE_ANGSTROM_AMU_TIME_TO_FS
+
+        # Exact Ornstein-Uhlenbeck update coefficients for the O step.
+        self._c1 = math.exp(-self.friction * self.timestep)
+        self._c2 = math.sqrt(1.0 - self._c1 ** 2)
+
+        self.energy, self.forces = _energy_forces(self.model, self.species, self.coordinates,
+                                                    self.cell, self.pbc)
+        self._accelerations = self.forces / self.masses * self._accel_factor
+
+    def kinetic_energy(self) -> Tensor:
+        """Kinetic energy per batch entry, in Hartree."""
+        return 0.5 * (self.masses * self.velocities ** 2).sum(dim=(-2, -1)) \
+            / self._accel_factor
+
+    def total_energy(self) -> Tensor:
+        """Potential + kinetic energy per batch entry, in Hartree."""
+        return self.energy + self.kinetic_energy()
+
+    def _ou_kick(self) -> None:
+        noise = torch.randn(self.velocities.shape, device=self.velocities.device,
+                             dtype=self.velocities.dtype, generator=self.generator)
+        self.velocities = self._c1 * self.velocities + self._c2 * self._sigma * noise
+
+    def step(self) -> EnergyForces:
+        dt = self.timestep
+        # B: half-step velocity kick from the deterministic force.
+        self.velocities = self.velocities + 0.5 * self._accelerations * dt
+        # A: half-step drift.
+        self.coordinates = self.coordinates + 0.5 * self.velocities * dt
+        # O: exact Ornstein-Uhlenbeck friction + random force update.
+        self._ou_kick()
+        # A: second half-step drift.
+        self.coordinates = self.coordinates + 0.5 * self.velocities * dt
+        # B: half-step velocity kick from the force at the new coordinates.
+        self.energy, self.forces = _energy_forces(self.model, self.species, self.coordinates,
+                                                    self.cell, self.pbc)
+        new_accelerations = self.forces / self.masses * self._accel_factor
+        self.velocities = self.velocities + 0.5 * new_accelerations * dt
+        self._accelerations = new_accelerations
+        return EnergyForces(self.energy, self.forces)
+
+    def run(self, n_steps: int,
+            callback: Optional[Callable[[int, Tensor, Tensor, Tensor, Tensor], None]] = None
+            ) -> Tensor:
+        """Run ``n_steps`` steps of BAOAB Langevin dynamics.
+
+        ``callback``, if given, is called after every step as
+        ``callback(step, coordinates, velocities, energy, forces)``.
+
+        Returns the final ``coordinates``.
+        """
+        for step in range(n_steps):
+            self.step()
+            if callback is not None:
+                callback(step, self.coordinates, self.velocities, self.energy, self.forces)
+        return self.coordinates
