@@ -69,7 +69,7 @@ class DistanceLayer(nn.Module):
 
     def forward(self, x):
         n_atom = x.shape[1]
-        indices = torch.triu_indices(n_atom, n_atom, 1)
+        indices = torch.triu_indices(n_atom, n_atom, 1, device=x.device)
         return (x[:,indices[1,:],:] - x[:,indices[0,:],:]).norm(2,-1)
 
 class CoefficientConvert(nn.Module):
@@ -87,7 +87,7 @@ class CoefficientConvert(nn.Module):
         n_atom = x.shape[1]
         if indices == None:
             # Non-periodic system
-            ind = torch.triu_indices(n_atom, n_atom, 1)
+            ind = torch.triu_indices(n_atom, n_atom, 1, device=x.device)
             return (x[:,ind[0,:]] * x[:,ind[1,:]])**0.5
         else:
             # Periodic system
@@ -549,7 +549,7 @@ class DispersionLayer(nn.Module):
         if cell is None or pbc is None:
             n_atom = m1.shape[1]
             distance = self.distance_layer(species_coordinates[1])
-            index = torch.triu_indices(n_atom, n_atom, 1)
+            index = torch.triu_indices(n_atom, n_atom, 1, device=m1.device)
         else:
             distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
         c6_pair = self.c6_layer(m1, polar, index)
@@ -713,7 +713,7 @@ class C6DispersionLayer(DispersionLayer):
         if cell is None or pbc is None:
             n_atom = m1.shape[1]
             distance = self.distance_layer(species_coordinates[1])
-            index = torch.triu_indices(n_atom, n_atom, 1)
+            index = torch.triu_indices(n_atom, n_atom, 1, device=m1.device)
         else:
             distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
         c6_pair = self.c6_layer(m1, polar, index)
@@ -734,7 +734,7 @@ class C8DispersionLayer(DispersionLayer):
         if cell is None or pbc is None:
             n_atom = m1.shape[1]
             distance = self.distance_layer(species_coordinates[1])
-            index = torch.triu_indices(n_atom, n_atom, 1)
+            index = torch.triu_indices(n_atom, n_atom, 1, device=m1.device)
         else:
             distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
         c6_pair = self.c6_layer(m1, polar, index)
@@ -755,7 +755,7 @@ class C10DispersionLayer(DispersionLayer):
         if cell is None or pbc is None:
             n_atom = m1.shape[1]
             distance = self.distance_layer(species_coordinates[1])
-            index = torch.triu_indices(n_atom, n_atom, 1)
+            index = torch.triu_indices(n_atom, n_atom, 1, device=m1.device)
         else:
             distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
         c6_pair = self.c6_layer(m1, polar, index)
@@ -907,7 +907,7 @@ class EnergyExtractor(nn.Module):
         if cell is None or pbc is None:
             n_atom = m1.shape[1]
             distance = self.distance_layer(species_coordinates[1])
-            index = torch.triu_indices(n_atom, n_atom, 1)
+            index = torch.triu_indices(n_atom, n_atom, 1, device=m1.device)
         else:
             distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
         c6_pair = self.c6_layer(m1, polar, index)
