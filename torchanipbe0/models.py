@@ -34,7 +34,7 @@ from torch import Tensor
 from typing import Tuple, Optional, NamedTuple
 from .nn import SpeciesConverter, SpeciesEnergies
 from .aev import AEVComputer
-from .dispersion.nn import ANIDispersion, CoefficientExtractorCC, DispersionLayer, CoefficientLayer
+from .dispersion.nn import ANIDispersion, CoefficientExtractorCC, DispersionLayer, DispersionLayerCutoff, CoefficientLayer
 from .dispersion.nn import C6DispersionLayer, C8DispersionLayer, C10DispersionLayer
 from .dispersion.nn import EnergyExtractor, CoefficientExtractor, CoefficientExtractorCC
 from pathlib import Path
@@ -659,6 +659,48 @@ def MLXDM_2x(device=None):
                             [8.2794385587230224, 35.403450375407488, 26.774856262986901, 22.577665436425793, 75.344227406670839, 18.604506038051770, 65.219744182377752],
                             14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
 
+def MLXDM2_cutoff(device=None):
+    '''
+    Same trained model as MLXDM, but for non-periodic systems (clusters)
+    it prunes the pair list to distance <= cutoff before the coefficient
+    -combine layers instead of building the full O(n_atom^2) pair list,
+    which is much cheaper for large clusters. Numerically identical to
+    MLXDM (the switching function already zeroes contributions beyond the
+    cutoff) - this is purely a non-periodic performance optimization.
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    path = os.path.join(torchani_dir, 'resources/dispersion/')
+    ani_model = ANIPBE0()
+    ani_model = ani_model.to(device)
+    m1_net = CoefficientLayer._from_file_2(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_2(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_2(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_2(f'{path}v/', device=device)
+    return DispersionLayerCutoff(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706886, 7.423168043, 5.412164335],
+                            [8.2794385587, 35.403450375, 26.774856263, 22.577665436],
+                            14.0, torch.float32, device, ['H', 'C', 'N', 'O'])
+
+def MLXDM_2x_cutoff(device=None):
+    '''
+    Same trained model as MLXDM_2x, but for non-periodic systems (clusters)
+    it prunes the pair list to distance <= cutoff before the coefficient
+    -combine layers instead of building the full O(n_atom^2) pair list.
+    Numerically identical to MLXDM_2x - see MLXDM2_cutoff.
+    '''
+    torchani_dir = Path(__file__).resolve().parent.as_posix()
+    path = os.path.join(torchani_dir, 'resources/dispersion_2x/')
+    ani_model = ANIPBE0_2x()
+    ani_model = ani_model.to(device)
+    m1_net = CoefficientLayer._from_file_3(f'{path}m1/', device=device)
+    m2_net = CoefficientLayer._from_file_3(f'{path}m2/', device=device)
+    m3_net = CoefficientLayer._from_file_3(f'{path}m3/', device=device)
+    v_net = CoefficientLayer._from_file_3(f'{path}v/', device=device)
+    return DispersionLayerCutoff(ani_model.aev_computer, m1_net, m2_net, m3_net, v_net,
+                            0.4186, 2.6791, [4.4997895, 11.87706887, 7.42316804, 5.41216434, 19.57017029, 3.75882236, 14.71136939],
+                            [8.2794385587230224, 35.403450375407488, 26.774856262986901, 22.577665436425793, 75.344227406670839, 18.604506038051770, 65.219744182377752],
+                            14.0, torch.float32, device, ['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
+
 
 # Combine
 
@@ -671,6 +713,16 @@ def ANIPBE0_MLXDM(device=None):
     dispersion_model = MLXDM(device)
     return ANIDispersion(ani_model, dispersion_model)
 
+def ANIPBE0_MLXDM2_cutoff(device=None):
+    '''
+    ANIPBE0 with MLXDM2_cutoff - same physics as ANIPBE0_MLXDM, but faster
+    on large non-periodic clusters (see MLXDM2_cutoff).
+    '''
+    ani_model = ANIPBE0()
+    ani_model = ani_model.to(device)
+    dispersion_model = MLXDM2_cutoff(device)
+    return ANIDispersion(ani_model, dispersion_model)
+
 def ANIPBE0_2x_MLXDM_2x(device=None):
     '''                                                                                                                                                                                                     
     The model with ANIPBE0_2x and MLXDM_2x                                                                                                                                                                   
@@ -678,6 +730,16 @@ def ANIPBE0_2x_MLXDM_2x(device=None):
     ani_model = ANIPBE0_2x()
     ani_model = ani_model.to(device)
     dispersion_model = MLXDM_2x(device)
+    return ANIDispersion(ani_model, dispersion_model)
+
+def ANIPBE0_2x_MLXDM_2x_cutoff(device=None):
+    '''
+    ANIPBE0_2x with MLXDM_2x_cutoff - same physics as ANIPBE0_2x_MLXDM_2x,
+    but faster on large non-periodic clusters (see MLXDM2_cutoff).
+    '''
+    ani_model = ANIPBE0_2x()
+    ani_model = ani_model.to(device)
+    dispersion_model = MLXDM_2x_cutoff(device)
     return ANIDispersion(ani_model, dispersion_model)
 
 def ANI1x_MLXDM(device=None):

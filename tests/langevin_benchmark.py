@@ -37,8 +37,10 @@ def build_model(model_name, device):
     device = torch.device(device)
     if model_name == "anipbe0":
         model = torchanipbe0.models.ANIPBE0_2x(periodic_table_index=False).to(device)
-    else:
+    elif model_name == "mlxdm2":
         model = torchanipbe0.models.ANIPBE0_2x_MLXDM_2x(device)
+    else:
+        model = torchanipbe0.models.ANIPBE0_2x_MLXDM_2x_cutoff(device)
 
     param_types = {p.device.type for p in model.parameters()}
     if param_types != {device.type}:
@@ -209,9 +211,14 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("model", choices=["anipbe0", "mlxdm2"],
+    parser.add_argument("model", choices=["anipbe0", "mlxdm2", "mlxdm2_cutoff"],
                          help="anipbe0: electronic-only ANIPBE0-2x. "
-                              "mlxdm2: composite ANIPBE0-2x+MLXDM2 (electronic+dispersion)")
+                              "mlxdm2: composite ANIPBE0-2x+MLXDM2 (electronic+dispersion), "
+                              "O(n_atom^2) non-periodic dispersion pair list. "
+                              "mlxdm2_cutoff: same trained model as mlxdm2, but the "
+                              "non-periodic dispersion pair list is pruned to the cutoff "
+                              "before the coefficient-combine layers (ANIPBE0_2x_MLXDM_2x_cutoff) "
+                              "-- numerically identical energies/forces, faster on large clusters")
     parser.add_argument("--xyz-dir", default=DEFAULT_XYZ_DIR,
                          help="Directory of water-ball xyz files (default: %(default)s)")
     parser.add_argument("--pattern", default="water_ball_*.xyz",

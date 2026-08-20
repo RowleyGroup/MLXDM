@@ -9,7 +9,7 @@ import numpy as np
 from .. import utils
 import torch
 from torch import nn
-from .utils import CAtomic, BOHR_TO_ANSTROM, cutoff_function, neighbor_list
+from .utils import CAtomic, BOHR_TO_ANSTROM, cutoff_function, neighbor_list, neighbor_list_nopbc
 from ..ase import Calculator as TorchANICalculator
 from ..nn import SpeciesEnergies, ANIModel
 from typing import Tuple, Optional
@@ -109,6 +109,23 @@ class DistanceNeighborList(nn.Module):
 
     def forward(self, x, cell, pbc):
         return neighbor_list(x, cell, pbc, self.cut_off)
+
+
+class DistanceNeighborListNoPBC(nn.Module):
+    '''
+    Distance layer for non-periodic systems that prunes pairs beyond
+    cut_off before they reach the coefficient-combine layers, instead of
+    DistanceLayer's full [n_atom*(n_atom-1)/2] pair list.
+    x        : [n_batch, n_atom, 3]
+    output 1 : [n_batch, n_interaction]
+    output 2 : [2, n_interaction]
+    '''
+    def __init__(self, cut_off):
+        super().__init__()
+        self.cut_off = cut_off
+
+    def forward(self, x):
+        return neighbor_list_nopbc(x, self.cut_off)
 
 
 class DispersionModel(ANIModel):
@@ -567,7 +584,52 @@ class DispersionLayer(nn.Module):
         else:
             return TorchANICalculator(species, self, **kwargs)
 
-# Combine Layer 
+
+class DispersionLayerCutoff(DispersionLayer):
+    '''
+    Same model as DispersionLayer, but for non-periodic systems the pair
+    list is pruned to distance <= cutoff before it reaches the
+    coefficient-combine layers, instead of DispersionLayer's non-periodic
+    path which builds the full O(n_atom^2) triu pair list and only masks
+    the energy of far pairs at the end via the switching function in
+    EnergyLayer. Since that switching function already zeroes the
+    contribution of any pair beyond cutoff, dropping those pairs before
+    the combine layers gives numerically identical energies/forces while
+    skipping the wasted work - useful for large non-periodic clusters
+    where most pairs fall outside the dispersion cutoff. The periodic
+    branch already used a pruned neighbor list, so it is unchanged here.
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.distance_layer_nopbc = DistanceNeighborListNoPBC(self.cutoff)
+
+    def forward(self, species_coordinates, cell=None, pbc=None):
+        species_aev = self.aev_computer(species_coordinates, cell, pbc)
+        m1 = self.m1_net(species_aev)
+        m2 = self.m2_net(species_aev)
+        m3 = self.m3_net(species_aev)
+        v = self.v_net(species_aev)
+        polar = self.polar_layer((species_aev[0], v))
+        if cell is None or pbc is None:
+            distance, index = self.distance_layer_nopbc(species_coordinates[1])
+        else:
+            distance, index = self.distance_layer_neighbor(species_coordinates[1], cell, pbc)
+        c6_pair = self.c6_layer(m1, polar, index)
+        c8_pair = self.c8_layer(m1, m2, polar, index)
+        c10_pair = self.c10_layer(m1, m2, m3, polar, index)
+        rvdw = self.vdw_layer(c6_pair, c8_pair, c10_pair)
+        c6_energy = self.c6_e_layer(distance, c6_pair, rvdw)
+        c8_energy = self.c8_e_layer(distance, c8_pair, rvdw)
+        c10_energy = self.c10_e_layer(distance, c10_pair, rvdw)
+        return SpeciesEnergies(species_aev[0], c6_energy + c8_energy + c10_energy)
+
+    def ase(self, species=None, **kwargs):
+        if species is None:
+            return TorchANICalculator(self.species, self, **kwargs)
+        else:
+            return TorchANICalculator(species, self, **kwargs)
+
+# Combine Layer
 
 class ANIDispersion(nn.Module):
     '''

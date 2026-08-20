@@ -89,6 +89,21 @@ def compute_shifts(cell, pbc, cut_off):
         torch.cartesian_prod(-r1, -r2, -r3)
     ])
 
+def neighbor_list_nopbc(coor, cut_off):
+    '''
+    Neighbor list for a non-periodic system: prune pairs beyond cut_off
+    before they reach the coefficient-combine layers, instead of returning
+    the full triu pair list and only masking the energy at the end.
+    Mirrors neighbor_list's cutoff filtering, without the cell-shift part.
+    coor: [n_batch, n_atom, 3]
+    '''
+    n_batch, n_atoms, _ = coor.shape
+    index = torch.triu_indices(n_atoms, n_atoms, 1, dtype=torch.long, device=coor.device)
+    coordinate = coor.index_select(1, index.view(-1)).view(n_batch, 2, -1, 3)
+    dist = (coordinate[:, 1, :, :] - coordinate[:, 0, :, :]).norm(2, -1)
+    ok_label = (dist <= cut_off).any(dim=0)
+    return dist[:, ok_label], index[:, ok_label]
+
 def neighbor_list(coor, cell, pbc, cut_off):
     n_batch, n_atoms, _ = coor.shape
     # Compute self interaction
