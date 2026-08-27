@@ -239,9 +239,25 @@ def main():
                          help="Steps between trajectory frames (default: %(default)s)")
     parser.add_argument("--ts-interval", type=int, default=100,
                          help="Steps between time-series log rows (default: %(default)s)")
+    parser.add_argument("--cuaev", action="store_true",
+                         help="use the cuaev CUDA extension for AEV computation "
+                              "(non-periodic only, which these water balls already are)")
+    parser.add_argument("--batched-ensemble", action="store_true",
+                         help="evaluate the ANI ensemble as batched matmuls per element "
+                              "instead of a per-member Python loop -- cuts kernel-launch "
+                              "count, numerically identical up to float32 rounding")
     args = parser.parse_args()
 
     model, device = build_model(args.model, args.device)
+
+    if args.batched_ensemble:
+        from torchanipbe0.nn import enable_batched_ensemble
+        n = enable_batched_ensemble(model)
+        print(f"batched ensemble enabled on {n} Ensemble instance(s)")
+    if args.cuaev:
+        from torchanipbe0.aev import enable_cuaev
+        n = enable_cuaev(model)
+        print(f"cuaev enabled on {n} AEVComputer instance(s)")
 
     if args.xyz_file:
         if not os.path.isfile(args.xyz_file):

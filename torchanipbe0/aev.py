@@ -528,3 +528,31 @@ class AEVComputer(torch.nn.Module):
             aev = compute_aev(species, coordinates, self.triu_index, self.constants(), self.sizes, (cell, shifts))
 
         return SpeciesAEV(species, aev)
+
+
+def enable_cuaev(model: torch.nn.Module) -> int:
+    """Switch every :class:`AEVComputer` reachable from ``model`` over to the
+    cuaev CUDA extension, in place (e.g. ``models.ANIPBE0_2x_MLXDM_2x_cutoff(device)``,
+    which has none of its own ``use_cuda_extension=`` option). Combined
+    ANIPBE0_*_MLXDM_* models build one AEVComputer for the short-range NNP
+    and a separate one (same constants) for the dispersion layer, so this
+    typically toggles two distinct instances, not one. Returns the number
+    of AEVComputer instances toggled.
+
+    cuaev only supports non-periodic systems: passing ``cell``/``pbc`` to
+    ``model`` afterwards raises (see :meth:`AEVComputer.forward`).
+    """
+    if not has_cuaev:
+        raise RuntimeError(
+            "cuaev extension is not available; see the warning printed at "
+            "torchanipbe0 import time for why (torchanipbe0.cuaev.build.ensure_cuaev_loaded)")
+    seen = set()
+    count = 0
+    for module in model.modules():
+        if isinstance(module, AEVComputer) and id(module) not in seen:
+            seen.add(id(module))
+            module.use_cuda_extension = True
+            module.init_cuaev_computer()
+            module.cuaev_enabled = True
+            count += 1
+    return count

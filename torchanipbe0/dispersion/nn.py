@@ -159,19 +159,23 @@ class CoefficientLayer(nn.Module):
         '''
         def __init__(self, b0_list, b1_list):
             super().__init__()
-            self.b0_list = b0_list
-            self.b1_list = b1_list
             assert len(b0_list) == len(b1_list)
+            # Per-element b0/b1 as gather tables instead of a Python loop
+            # over species with boolean-mask indexing: `result[mask] = ...`
+            # (the original implementation) lowers to a nonzero()-based
+            # gather internally, which is a synchronizing op (its output
+            # size is data-dependent) -- looping it once per element, per
+            # coefficient net, per MD step was a real source of host<->GPU
+            # stalls. species[i] is a plain index gather with a
+            # statically-known output shape, so it never synchronizes.
+            self.register_buffer('b0', torch.tensor(b0_list))
+            self.register_buffer('b1', torch.tensor(b1_list))
 
         def forward(self, x):
-            species = x[0]
-            coef = x[1]
-            n = len(self.b0_list)
-            result = torch.zeros(coef.size(), dtype = coef.dtype, device = coef.device)
-            for i in range(n):
-                mask = (species == i)
-                result[mask] = self.b0_list[i] + self.b1_list[i] * coef[mask]
-            return result
+            species, coef = x
+            b0 = self.b0.to(device=coef.device, dtype=coef.dtype)
+            b1 = self.b1.to(device=coef.device, dtype=coef.dtype)
+            return b0[species] + b1[species] * coef
 
     def __init__(self, b0_list, b1_list, dtype = None, device = None):
         super().__init__()

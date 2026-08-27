@@ -6,18 +6,49 @@
 # integrator works end-to-end with a real ANIDispersion model: gradients
 # flow through both the ANI and MLXDM sub-networks every step, forces stay
 # finite, and the kinetic temperature tracks the requested bath temperature.
+#
+# Pass --cuaev to switch the AEVComputer(s) inside the model over to the
+# cuaev CUDA extension (see torchanipbe0.aev.enable_cuaev) instead of the
+# pure-PyTorch AEV path; --cuaev requires a non-periodic system, which this
+# water cluster already is.
+#
+# Pass --batched-ensemble to evaluate the 8-member ANI ensemble as one
+# batched matmul per element (see torchanipbe0.nn.enable_batched_ensemble)
+# instead of 8 separate small nn.Sequential calls per element -- cuts
+# kernel-launch count and is the main win for small/medium non-periodic MD,
+# where wall time is dominated by per-step launch overhead rather than
+# compute. Numerically identical (up to float32 rounding) to the unbatched
+# ensemble; combines with --cuaev.
+
+import argparse
 
 import torch
 from ase.build import molecule
 
 from torchanipbe0 import models, units
+from torchanipbe0.aev import enable_cuaev
+from torchanipbe0.nn import enable_batched_ensemble
 from torchanipbe0.md import optimize_geometry, Langevin, VelocityVerlet
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--cuaev', action='store_true',
+                     help='use the cuaev CUDA extension for AEV computation')
+parser.add_argument('--batched-ensemble', action='store_true',
+                     help='evaluate the ANI ensemble as batched matmuls instead of a '
+                          'per-member Python loop')
+args = parser.parse_args()
 
 device = torch.device('cuda')
 dtype = torch.float32
 
 torch.manual_seed(0)
 model = models.ANIPBE0_2x_MLXDM_2x(device)
+if args.batched_ensemble:
+    n = enable_batched_ensemble(model)
+    print(f'batched ensemble enabled on {n} Ensemble instance(s)')
+if args.cuaev:
+    n = enable_cuaev(model)
+    print(f'cuaev enabled on {n} AEVComputer instance(s)')
 
 # Build a cluster of water molecules on a cubic grid, each with a random
 # rotation/jitter so the optimizer isn't handed a degenerate symmetric start.
