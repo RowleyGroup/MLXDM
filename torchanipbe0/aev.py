@@ -5,18 +5,10 @@ import math
 from typing import Tuple, Optional, NamedTuple
 import sys
 import warnings
-# import importlib_metadata
 
-# has_cuaev = 'torchani.cuaev' in importlib_metadata.metadata(__package__).get_all('Provides')
+from .cuaev.build import ensure_cuaev_loaded
 
-has_cuaev = False
-
-# To eliminate the warning
-# if has_cuaev:
-#     # We need to import torchani.cuaev to tell PyTorch to initialize torch.ops.cuaev
-#     from . import cuaev  # type: ignore # noqa: F401
-# else:
-#     warnings.warn("cuaev not installed")
+has_cuaev = ensure_cuaev_loaded()
 
 if sys.version_info[:2] < (3, 7):
     class FakeFinal:
