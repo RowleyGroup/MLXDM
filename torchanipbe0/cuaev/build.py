@@ -199,6 +199,11 @@ def _assemble_cuda_home():
     nvcc_profile = os.path.join(os.path.dirname(nvcc), "nvcc.profile")
     if os.path.isfile(nvcc_profile):
         _link(nvcc_profile, os.path.join(_SANDBOX_DIR, "bin", "nvcc.profile"))
+    # nvcc looks for cicc/libdevice ('nvvm') at $CUDA_HOME/nvvm (bin/../nvvm)
+    # on some toolkit layouts (e.g. Compute Canada's EasyBuild cudacore/13.2.0)
+    # and at $CUDA_HOME/targets/<triplet>/nvvm on others (e.g. conda
+    # cuda-nvcc-tools) - link both so either lookup succeeds.
+    _link(nvvm_dir, os.path.join(_SANDBOX_DIR, "nvvm"))
     _link(nvvm_dir, os.path.join(_SANDBOX_DIR, "targets", "x86_64-linux", "nvvm"))
     _link(include_dir, os.path.join(_SANDBOX_DIR, "targets", "x86_64-linux", "include"))
     _link(libcudart, os.path.join(_SANDBOX_DIR, "lib64", "libcudart.so"))
